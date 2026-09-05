@@ -35,6 +35,7 @@ import {
   fetchFulfillmentOrder,
   fetchFulfillmentOrders,
   overrideSplit,
+  shipFulfillments,
   suggestSplit,
 } from '../../../features/fulfillment/fulfillment.api';
 import type { OverrideAllocation } from '../../../features/fulfillment/fulfillment.api';
@@ -186,6 +187,11 @@ export default function FulfillmentDetail() {
         : 'Suggested split';
   const decided = order.fulfillments.length > 0;
   const suggestion = order.latestSuggestion;
+  // Shipping is what lets billing happen: the one-time invoice is raised for
+  // the quantities these shipments carry (specs.md §4 reconciliation rule).
+  const unshipped = order.fulfillments.filter(
+    (fulfillment) => fulfillment.status === 'RESERVED' || fulfillment.status === 'PENDING',
+  );
 
   return (
     <InternalLayout
@@ -193,7 +199,28 @@ export default function FulfillmentDetail() {
       title={`${order.number} — ${order.customer.name}`}
       actions={
         decided ? (
-          <Badge variant="info">{order.fulfillments.length} shipments reserved</Badge>
+          <>
+            <Badge variant="info">
+              {order.fulfillments.length} shipments · {unshipped.length} awaiting dispatch
+            </Badge>
+            {unshipped.length > 0 ? (
+              <Button
+                onClick={() =>
+                  void run(
+                    () => shipFulfillments(id, SALES_REP.id),
+                    'Shipped — a one-time invoice was raised for the shipped quantities only.',
+                  )
+                }
+                disabled={busy}
+              >
+                {busy ? 'Working…' : 'Mark Shipped'}
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => navigate('/invoices')}>
+                View invoices
+              </Button>
+            )}
+          </>
         ) : (
           <>
             <Button

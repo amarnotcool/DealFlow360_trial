@@ -20,6 +20,11 @@ export function points(value: string | number): string {
   return Number.isFinite(asNumber) ? `${Number(asNumber.toFixed(2))}` : String(value);
 }
 
+/** Calendar dates — due dates, billing periods — without a time of day. */
+export function date(value: string | null): string {
+  return value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+}
+
 export function dateTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
 }

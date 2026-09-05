@@ -42,3 +42,11 @@ export function overrideSplit(
 ) {
   return apiPost<FulfillmentDetailView>(`/fulfillment/${salesOrderId}/override-split`, body);
 }
+
+/**
+ * Ships the reserved shipments. This is what makes billing legal: the one-time
+ * invoice is raised for the quantities this shipment carried, nothing more.
+ */
+export function shipFulfillments(salesOrderId: string, actorUserId: string) {
+  return apiPost<FulfillmentDetailView>(`/fulfillment/${salesOrderId}/ship`, { actorUserId });
+}
