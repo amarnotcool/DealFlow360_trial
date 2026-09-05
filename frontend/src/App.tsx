@@ -9,6 +9,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ApprovalDetail from './pages/internal/approvals/ApprovalDetail';
 import ApprovalsList from './pages/internal/approvals/ApprovalsList';
 import DealHealthDashboard from './pages/internal/deal-health/DealHealthDashboard';
+import Dashboard from './pages/internal/Dashboard';
 import CustomerDetail from './pages/internal/customers/CustomerDetail';
 import CustomersList from './pages/internal/customers/CustomersList';
 import Login from './pages/auth/Login';
@@ -41,7 +42,18 @@ export default function App() {
       {/* The customer portal is its own surface, with its own session. */}
       <Route path="/portal/*" element={<PortalRoutes />} />
 
-      <Route path="/" element={<Navigate to="/quotations" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+      {/* Screen 2: every role lands here. The dashboard itself splits by role,
+          so this route takes no role guard — only a signed-in user. */}
+      <Route
+        path="/dashboard"
+        element={
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/quotations"
@@ -227,7 +239,7 @@ export default function App() {
 
       <Route path="/preview" element={<Preview />} />
       <Route path="/system" element={<SystemStatus />} />
-      <Route path="*" element={<Navigate to="/quotations" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

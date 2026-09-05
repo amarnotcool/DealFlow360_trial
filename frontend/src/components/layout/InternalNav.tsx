@@ -36,7 +36,7 @@ function Glyph({ d }: { d: string }) {
 
 // Nav items follow specs.md §6.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', to: '/dashboard', enabled: false, roles: ALL_ROLES, icon: <Glyph d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /> },
+  { label: 'Dashboard', to: '/dashboard', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /> },
   { label: 'Quotations', to: '/quotations', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M7 4h7l4 4v12H7zM14 4v4h4M10 13h6M10 17h4" /> },
   { label: 'Approvals', to: '/approvals', enabled: true, roles: APPROVALS_ROLES, icon: <Glyph d="M4 12l5 5L20 6" /> },
   { label: 'Fulfillment', to: '/fulfillment', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M3 8h11v9H3zM14 11h4l3 3v3h-7zM7 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /> },

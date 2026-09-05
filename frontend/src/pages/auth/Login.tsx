@@ -38,7 +38,7 @@ export default function Login() {
 
   // Someone already signed in has no business on this page.
   if (user) {
-    return <Navigate to="/quotations" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -53,7 +53,7 @@ export default function Login() {
     }
 
     const from = (location.state as { from?: string } | null)?.from;
-    navigate(from && from !== '/login' ? from : '/quotations', { replace: true });
+    navigate(from && from !== '/login' ? from : '/dashboard', { replace: true });
   }
 
   return (
