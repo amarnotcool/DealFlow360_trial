@@ -224,35 +224,46 @@ export async function listFulfillment(params: ListFulfillmentParams) {
   return { rows: summarised, total, warehouses: stock };
 }
 
-/** Screen 8: the order, the split the allocator suggests right now, and backorders. */
+/** Screen 8: the order, the split it is working from, and backorders. */
 export async function getFulfillment(salesOrderId: string) {
   const order = await loadOrder(prisma, salesOrderId);
-  const context = await buildAllocatorContext(prisma, order);
-
-  // Computed on read so the screen always shows what current stock allows.
-  // Reads never write: persisting a suggestion is POST /suggest-split.
-  const suggestion = allocateSplit(context.input);
   const { splitSuggestions, ...rest } = order;
+  const stored = splitSuggestions[0] ?? null;
+
+  // A stored suggestion is a snapshot and is returned as it was written. Only
+  // an order with no suggestion yet gets a fresh allocation computed on read,
+  // so the screen has something to accept. Reads never write: persisting a
+  // suggestion is POST /suggest-split.
+  //
+  // Recomputing on every read is what made an accepted split come back with a
+  // false backorder — the stock it had just reserved was gone from `available`.
+  let payload: StoredSplitPayload;
+  if (stored) {
+    payload = stored.payload as unknown as StoredSplitPayload;
+  } else {
+    const context = await buildAllocatorContext(prisma, order);
+    payload = { ...allocateSplit(context.input), skipped: context.skipped };
+  }
 
   return {
     ...rest,
     suggestions: splitSuggestions,
-    latestSuggestion: splitSuggestions[0] ?? null,
-    suggestedSplit: decorateSuggestion(order, suggestion, context.skipped),
+    latestSuggestion: stored,
+    splitStatus: stored?.status ?? null,
+    suggestedSplit: decorateSuggestion(order, payload),
   };
 }
 
-/** Attaches the product names a screen needs to the raw allocator output. */
-function decorateSuggestion(
-  order: SalesOrderDetail,
-  result: SplitAllocatorResult,
-  skipped: SkippedLine[],
-) {
+/** What a suggestion's `payload` column holds: an allocator result plus skips. */
+type StoredSplitPayload = SplitAllocatorResult & { skipped: SkippedLine[] };
+
+/** Attaches the product names a screen needs to a stored or fresh allocation. */
+function decorateSuggestion(order: SalesOrderDetail, payload: StoredSplitPayload) {
   const lineById = new Map(order.lines.map((line) => [line.id, line]));
 
   return {
-    ...result,
-    lines: result.lines.map((line) => {
+    ...payload,
+    lines: (payload.lines ?? []).map((line) => {
       const orderLine = lineById.get(line.lineId);
       return {
         ...line,
@@ -265,7 +276,7 @@ function decorateSuggestion(
           : null,
       };
     }),
-    skipped: skipped.map((entry) => ({
+    skipped: (payload.skipped ?? []).map((entry) => ({
       ...entry,
       description: lineById.get(entry.salesOrderLineId)?.product.name ?? null,
     })),
@@ -333,6 +344,7 @@ function toPayload(
   result: SplitAllocatorResult,
   skipped: SkippedLine[],
 ): Prisma.InputJsonValue {
+  // Same shape getFulfillment reads back: an allocator result plus the skips.
   return JSON.parse(JSON.stringify({ ...result, skipped })) as Prisma.InputJsonValue;
 }
 
@@ -603,43 +615,22 @@ export async function overrideSplit(salesOrderId: string, input: OverrideSplitIn
     const open = order.splitSuggestions.find((row) => row.status === SplitSuggestionStatus.SUGGESTED);
     const plans = [...byWarehouse.values()];
 
-    const suggestion = open
-      ? await tx.fulfillmentSplitSuggestion.update({
-          where: { id: open.id },
-          data: {
-            status: SplitSuggestionStatus.OVERRIDDEN,
-            isManualOverride: true,
-            estimatedShipmentCount: plans.length,
-            estimatedCost: await estimateCost(tx, plans),
-            acceptedByUserId: input.actorUserId,
-            acceptedAt: new Date(),
-          },
-        })
-      : await tx.fulfillmentSplitSuggestion.create({
-          data: {
-            salesOrderId,
-            status: SplitSuggestionStatus.OVERRIDDEN,
-            isManualOverride: true,
-            estimatedShipmentCount: plans.length,
-            estimatedCost: await estimateCost(tx, plans),
-            acceptedByUserId: input.actorUserId,
-            acceptedAt: new Date(),
-            payload: {},
-          },
-        });
+    // The override is stored in the same shape a suggestion is, so a later read
+    // can show what actually ships without recomputing anything.
+    const manual = await buildManualPayload(tx, order, plans, context.skipped, input.reason ?? null);
+    const data = {
+      status: SplitSuggestionStatus.OVERRIDDEN,
+      isManualOverride: true,
+      estimatedShipmentCount: manual.estimatedShipmentCount,
+      estimatedCost: D(manual.estimatedCost),
+      acceptedByUserId: input.actorUserId,
+      acceptedAt: new Date(),
+      payload: JSON.parse(JSON.stringify(manual)) as Prisma.InputJsonValue,
+    };
 
-    await tx.fulfillmentSplitSuggestion.update({
-      where: { id: suggestion.id },
-      data: {
-        payload: JSON.parse(
-          JSON.stringify({
-            manualOverride: true,
-            allocations: input.allocations,
-            reason: input.reason ?? null,
-          }),
-        ) as Prisma.InputJsonValue,
-      },
-    });
+    const suggestion = open
+      ? await tx.fulfillmentSplitSuggestion.update({ where: { id: open.id }, data })
+      : await tx.fulfillmentSplitSuggestion.create({ data: { salesOrderId, ...data } });
 
     const { fulfillmentIds, backorderIds } = await materialise(tx, order, plans, suggestion.id, true);
 
@@ -658,16 +649,80 @@ export async function overrideSplit(salesOrderId: string, input: OverrideSplitIn
   return getFulfillment(salesOrderId);
 }
 
-async function estimateCost(
+/**
+ * Describes a manual allocation the way the allocator describes its own: per
+ * line what was allocated and what is short, per warehouse one shipment.
+ */
+async function buildManualPayload(
   tx: Prisma.TransactionClient,
+  order: SalesOrderDetail,
   plans: ShipmentPlan[],
-): Promise<Prisma.Decimal> {
+  skipped: SkippedLine[],
+  reason: string | null,
+): Promise<StoredSplitPayload & { manualOverride: true; reason: string | null }> {
   const warehouses = await tx.warehouse.findMany({
     where: { id: { in: plans.map((plan) => plan.warehouseId) } },
-    select: { shippingCostWeight: true },
+  });
+  const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+
+  const shipments = plans.map((plan) => {
+    const warehouse = warehouseById.get(plan.warehouseId);
+    if (!warehouse) {
+      throw new NotFoundError('Warehouse', plan.warehouseId);
+    }
+    return {
+      warehouseId: plan.warehouseId,
+      warehouseCode: warehouse.code,
+      shippingCostWeight: warehouse.shippingCostWeight.toNumber(),
+      totalQty: plan.lines.reduce((sum, line) => sum.plus(line.quantity), D(0)).toNumber(),
+      lines: plan.lines.map((line) => ({
+        lineId: line.salesOrderLineId,
+        quantity: line.quantity.toNumber(),
+      })),
+    };
   });
 
-  return warehouses
-    .reduce((sum, warehouse) => sum.plus(warehouse.shippingCostWeight), D(0))
-    .toDecimalPlaces(2);
+  const skippedLineIds = new Set(skipped.map((entry) => entry.salesOrderLineId));
+
+  const lines = order.lines
+    .filter((line) => !skippedLineIds.has(line.id))
+    .map((line) => {
+      const allocations = plans
+        .flatMap((plan) =>
+          plan.lines
+            .filter((planLine) => planLine.salesOrderLineId === line.id)
+            .map((planLine) => ({
+              warehouseId: plan.warehouseId,
+              warehouseCode: warehouseById.get(plan.warehouseId)?.code ?? plan.warehouseId,
+              quantity: planLine.quantity.toNumber(),
+            })),
+        )
+        .sort((a, b) => (a.warehouseCode < b.warehouseCode ? -1 : 1));
+
+      const required = line.quantity.minus(line.quantityFulfilled);
+      const allocated = allocations.reduce((sum, entry) => sum.plus(D(entry.quantity)), D(0));
+
+      return {
+        lineId: line.id,
+        requiredQty: required.toNumber(),
+        allocatedQty: allocated.toNumber(),
+        backorderQty: required.minus(allocated).toNumber(),
+        allocations,
+      };
+    });
+
+  return {
+    manualOverride: true,
+    reason,
+    lines,
+    shipments,
+    skipped,
+    estimatedShipmentCount: shipments.length,
+    estimatedCost: Number(
+      shipments.reduce((sum, shipment) => sum + shipment.shippingCostWeight, 0).toFixed(2),
+    ),
+    totalBackorderQty: Number(
+      lines.reduce((sum, line) => sum + line.backorderQty, 0).toFixed(2),
+    ),
+  };
 }
