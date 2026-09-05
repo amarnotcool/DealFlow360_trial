@@ -83,3 +83,10 @@ export function downloadReportPdf(filters: ReportFilterState) {
     'dealflow360-report.pdf',
   );
 }
+
+export function downloadReportXlsx(filters: ReportFilterState) {
+  return apiDownload(
+    `/reports/export${toQueryString(filters, { format: 'xlsx' })}`,
+    'dealflow360-report.xlsx',
+  );
+}

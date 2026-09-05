@@ -30,7 +30,7 @@ const MUTED = '#666666';
 const RULE = '#CCCCCC';
 
 /** Column widths for the quotations table, summing to the content width. */
-const COLUMNS: { key: keyof ReportQuotationRow | 'customerName' | 'ownerName'; label: string; width: number; align: 'left' | 'right' }[] = [
+export const COLUMNS: { key: keyof ReportQuotationRow | 'customerName' | 'ownerName'; label: string; width: number; align: 'left' | 'right' }[] = [
   { key: 'number', label: 'Quotation', width: 78, align: 'left' },
   { key: 'customerName', label: 'Customer', width: 104, align: 'left' },
   { key: 'ownerName', label: 'Owner', width: 92, align: 'left' },
@@ -53,7 +53,7 @@ function formatMoney(value: string): string {
   return `${grouped}.${fraction}`;
 }
 
-function cellValue(row: ReportQuotationRow, key: string): string {
+export function cellValue(row: ReportQuotationRow, key: string): string {
   switch (key) {
     case 'customerName':
       return row.customer.tierCode ? `${row.customer.name} (${row.customer.tierCode})` : row.customer.name;
@@ -71,7 +71,7 @@ function cellValue(row: ReportQuotationRow, key: string): string {
 }
 
 /** The filter lines, in the order specs screen 15 lists the filters. */
-function filterLines(summary: ReportSummary): string[] {
+export function filterLines(summary: ReportSummary): string[] {
   const { filters } = summary;
   // An open-ended period is named as such rather than printed with a dash on
   // the missing side, which reads as a missing value rather than a choice.
@@ -89,7 +89,7 @@ function filterLines(summary: ReportSummary): string[] {
 }
 
 /** The summary section, as label/value pairs grouped under headings. */
-function metricGroups(summary: ReportSummary): { heading: string; pairs: [string, string][] }[] {
+export function metricGroups(summary: ReportSummary): { heading: string; pairs: [string, string][] }[] {
   const { quotations, value, approvals, discounts, billing, subscriptions, backorders } = summary;
 
   const statusPairs = (Object.entries(quotations.byStatus) as [string, number][])

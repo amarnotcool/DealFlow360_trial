@@ -44,6 +44,7 @@ import type { RiskLevel as RiskLevelView } from '@dealflow360/shared';
 
 import { prisma } from '../../lib/prisma-client';
 import { renderReportPdf } from './reporting.pdf';
+import { renderReportXlsx } from './reporting.xlsx';
 import type { ReportExportQuery, ReportFiltersQuery, ReportQuotationsQuery } from './reporting.schemas';
 
 const ZERO = new Prisma.Decimal(0);
@@ -594,11 +595,20 @@ const EXPORT_ROW_LIMIT = 200;
 
 export async function exportReport(
   filters: ReportExportQuery,
-): Promise<{ buffer: Buffer; filename: string }> {
+): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   const [summary, quotations] = await Promise.all([
     getSummary(filters),
     listReportQuotations({ ...filters, skip: 0, take: EXPORT_ROW_LIMIT }),
   ]);
+
+  if (filters.format === 'xlsx') {
+    const stamp = summary.generatedAt.slice(0, 10);
+    return {
+      buffer: renderReportXlsx({ summary, rows: quotations.rows, totalRows: quotations.meta.total, rowLimit: EXPORT_ROW_LIMIT }),
+      filename: `dealflow360-report-${stamp}.xlsx`,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+  }
 
   const buffer = await renderReportPdf({
     summary,
@@ -608,5 +618,5 @@ export async function exportReport(
   });
 
   const stamp = summary.generatedAt.slice(0, 10);
-  return { buffer, filename: `dealflow360-report-${stamp}.pdf` };
+  return { buffer, filename: `dealflow360-report-${stamp}.pdf`, contentType: 'application/pdf' };
 }

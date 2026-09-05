@@ -19,6 +19,7 @@ import type {
 import {
   EMPTY_FILTERS,
   downloadReportPdf,
+  downloadReportXlsx,
   fetchDiscountReport,
   fetchFilterProducts,
   fetchReportOwners,
@@ -50,6 +51,7 @@ export interface ReportingState {
   exporting: boolean;
   notice: string | null;
   exportPdf: () => Promise<void>;
+  exportXlsx: () => Promise<void>;
 }
 
 /** Hands the browser a blob to save under the name the API chose. */
@@ -148,6 +150,21 @@ export function useReporting(): ReportingState {
     setNotice(`Exported ${result.filename} with the filters currently applied.`);
   }, [filters]);
 
+  const exportXlsx = useCallback(async () => {
+    setExporting(true);
+    setError(null);
+    const result = await downloadReportXlsx(filters);
+    setExporting(false);
+
+    if (!result.blob) {
+      setError(result.error);
+      return;
+    }
+
+    saveBlob(result.blob, result.filename);
+    setNotice(`Exported ${result.filename} with the filters currently applied.`);
+  }, [filters]);
+
   return {
     filters,
     setFilter,
@@ -164,5 +181,6 @@ export function useReporting(): ReportingState {
     exporting,
     notice,
     exportPdf,
+    exportXlsx,
   };
 }

@@ -37,11 +37,11 @@ export const reportQuotationsQuerySchema = reportFiltersSchema.extend({
 export type ReportQuotationsQuery = z.infer<typeof reportQuotationsQuerySchema>;
 
 /**
- * Export takes the same filters plus the format. Only PDF is implemented —
- * specs also names XLS, and an unimplemented value must fail the schema rather
- * than silently hand back a PDF under an XLS name.
+ * Export takes the same filters plus the format.
+ * An unimplemented value must fail the schema rather than silently hand back
+ * a PDF under an XLS name.
  */
 export const reportExportQuerySchema = reportFiltersSchema.extend({
-  format: z.literal('pdf').default('pdf'),
+  format: z.enum(['pdf', 'xlsx']).default('pdf'),
 });
 export type ReportExportQuery = z.infer<typeof reportExportQuerySchema>;

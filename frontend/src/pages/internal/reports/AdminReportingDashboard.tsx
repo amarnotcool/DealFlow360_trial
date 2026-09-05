@@ -1,10 +1,10 @@
 // Screen 15 (specs.md §6): "Filters: Period, Sales Team, Approval Status,
-// Product. Export PDF."
+// Product. Export PDF / XLSX."
 //
 // Everything here is read from /reports, which aggregates and decides nothing.
 // The screen adds no arithmetic of its own: percentages, averages and totals
 // arrive computed, and are formatted for display only. The export ships the
-// same filters the screen is showing, so the PDF is never a different report.
+// same filters the screen is showing, so the file is never a different report.
 
 import { useNavigate } from 'react-router-dom';
 import type { QuotationStatus, ReportQuotationRow } from '@dealflow360/shared';
@@ -69,6 +69,7 @@ export default function AdminReportingDashboard() {
     exporting,
     notice,
     exportPdf,
+    exportXlsx,
   } = useReporting();
 
   const openQuotation = (row: ReportQuotationRow) => navigate(`/quotations/${row.id}`);
@@ -78,9 +79,14 @@ export default function AdminReportingDashboard() {
       breadcrumb={['DealFlow360']}
       title="Reports"
       actions={
-        <Button onClick={() => void exportPdf()} disabled={exporting}>
-          {exporting ? 'Preparing…' : 'Export PDF'}
-        </Button>
+        <>
+          <Button onClick={() => void exportPdf()} disabled={exporting}>
+            {exporting ? 'Preparing…' : 'Export PDF'}
+          </Button>
+          <Button variant="secondary" onClick={() => void exportXlsx()} disabled={exporting}>
+            {exporting ? 'Preparing…' : 'Export XLSX'}
+          </Button>
+        </>
       }
     >
       {error && (

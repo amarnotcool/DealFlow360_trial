@@ -43,9 +43,9 @@ export async function owners(_req: Request, res: Response): Promise<void> {
  */
 export async function exportReport(req: Request, res: Response): Promise<void> {
   const filters = req.query as unknown as ReportExportQuery;
-  const { buffer, filename } = await reportingService.exportReport(filters);
+  const { buffer, filename, contentType } = await reportingService.exportReport(filters);
 
-  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Type', contentType);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Content-Length', String(buffer.length));
   res.send(buffer);
