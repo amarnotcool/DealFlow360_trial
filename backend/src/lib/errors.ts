@@ -30,3 +30,17 @@ export class ConflictError extends AppError {
     super('CONFLICT', message, 409);
   }
 }
+
+/** No usable session on a request that needs one. */
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication is required') {
+    super('UNAUTHORIZED', message, 401);
+  }
+}
+
+/** A real session, but the role it carries is not allowed to do this. */
+export class ForbiddenError extends AppError {
+  constructor(message: string) {
+    super('FORBIDDEN', message, 403);
+  }
+}

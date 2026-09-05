@@ -48,10 +48,12 @@ const ID = {
   roleSalesRep: '66666666-6666-4666-8666-000000000001',
   roleSalesManager: '66666666-6666-4666-8666-000000000002',
   roleFinance: '66666666-6666-4666-8666-000000000003',
+  roleAdmin: '66666666-6666-4666-8666-000000000004',
 
   userSalesRep: '77777777-7777-4777-8777-000000000001',
   userSalesManager: '77777777-7777-4777-8777-000000000002',
   userFinance: '77777777-7777-4777-8777-000000000003',
+  userAdmin: '77777777-7777-4777-8777-000000000004',
 
   portalRoleBuyer: '88888888-8888-4888-8888-000000000001',
   customerAcme: '88888888-8888-4888-8888-000000000002',
@@ -118,8 +120,11 @@ const hybridMarginPct = hybridSubtotal.isZero()
   ? D(0)
   : hybridMargin.div(hybridSubtotal).mul(100).toDecimalPlaces(2);
 
-// Dev-only placeholder credential; every seeded login shares it.
-const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync('dealflow360', 10);
+// Dev-only credential: every seeded internal login and the portal contact share
+// the password `dealflow360`. It is hashed here the same way a real one would
+// be, so POST /auth/login runs the identical bcrypt comparison.
+const SEED_PASSWORD = 'dealflow360';
+const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync(SEED_PASSWORD, 10);
 
 async function main() {
   await prisma.$transaction(async (tx) => {
@@ -193,6 +198,7 @@ async function main() {
         { id: ID.roleSalesRep, code: 'SALES_REP', name: 'Sales Rep' },
         { id: ID.roleSalesManager, code: 'SALES_MANAGER', name: 'Sales Manager' },
         { id: ID.roleFinance, code: 'FINANCE', name: 'Finance' },
+        { id: ID.roleAdmin, code: 'ADMIN', name: 'Admin' },
       ],
     });
 
@@ -201,6 +207,7 @@ async function main() {
         { id: ID.userSalesRep, email: 'rep@dealflow360.test', fullName: 'Riya Sales Rep', passwordHash: PLACEHOLDER_PASSWORD_HASH },
         { id: ID.userSalesManager, email: 'manager@dealflow360.test', fullName: 'Manav Sales Manager', passwordHash: PLACEHOLDER_PASSWORD_HASH },
         { id: ID.userFinance, email: 'finance@dealflow360.test', fullName: 'Farah Finance', passwordHash: PLACEHOLDER_PASSWORD_HASH },
+        { id: ID.userAdmin, email: 'admin@dealflow360.test', fullName: 'Anaya Admin', passwordHash: PLACEHOLDER_PASSWORD_HASH },
       ],
     });
 
@@ -209,6 +216,7 @@ async function main() {
         { userId: ID.userSalesRep, roleId: ID.roleSalesRep },
         { userId: ID.userSalesManager, roleId: ID.roleSalesManager },
         { userId: ID.userFinance, roleId: ID.roleFinance },
+        { userId: ID.userAdmin, roleId: ID.roleAdmin },
       ],
     });
 

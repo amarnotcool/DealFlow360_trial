@@ -6,6 +6,7 @@ import express from 'express';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { approvalsRoutes } from './modules/approvals/approvals.routes';
+import { authRoutes } from './modules/auth/auth.routes';
 import { billingRoutes } from './modules/billing/billing.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
@@ -19,6 +20,9 @@ export function createApp() {
   app.use(express.json());
 
   app.use(healthRoutes);
+  // Everything below authRoutes needs a session; each module applies `auth`
+  // itself so a route can never be mounted without one by accident.
+  app.use(authRoutes);
   app.use(quotationsRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);

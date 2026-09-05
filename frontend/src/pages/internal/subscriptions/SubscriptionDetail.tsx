@@ -35,7 +35,6 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { FINANCE } from '../../../config/current-user';
 import { fetchOrderBilling } from '../../../features/invoices/invoices.api';
 import {
   cancelSubscription,
@@ -186,7 +185,6 @@ export default function SubscriptionDetail() {
 
     setBusy(true);
     const response = await changeSubscription(id, {
-      actorUserId: FINANCE.id,
       subscriptionPlanId: planId || null,
       quantity: nextQuantity,
     });
@@ -208,10 +206,7 @@ export default function SubscriptionDetail() {
 
   async function submitCancel() {
     setBusy(true);
-    const response = await cancelSubscription(id, {
-      actorUserId: FINANCE.id,
-      reason: reason.trim() || null,
-    });
+    const response = await cancelSubscription(id, { reason: reason.trim() || null });
     setBusy(false);
 
     if (!response.data) {
@@ -231,7 +226,7 @@ export default function SubscriptionDetail() {
 
   async function generateInvoice() {
     setBusy(true);
-    const response = await generateSubscriptionInvoice(id, FINANCE.id);
+    const response = await generateSubscriptionInvoice(id);
     setBusy(false);
 
     if (!response.data) {

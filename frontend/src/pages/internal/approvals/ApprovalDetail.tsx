@@ -24,7 +24,7 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { FINANCE, SALES_MANAGER } from '../../../config/current-user';
+import { useAuth } from '../../../features/auth/useAuth';
 import { decideApproval, fetchApproval } from '../../../features/approvals/approvals.api';
 import { dateTime, humanise, money, percent } from '../../../lib/format';
 
@@ -37,6 +37,7 @@ const STEP_BADGE = {
 
 export default function ApprovalDetail() {
   const { id = '' } = useParams();
+  const { user } = useAuth();
   const [approval, setApproval] = useState<ApprovalDetailView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -52,16 +53,14 @@ export default function ApprovalDetail() {
     void load();
   }, [load]);
 
-  /** The step waiting on a decision decides who is acting, until auth lands. */
   const pendingStep = approval?.timeline.find((step) => step.status === 'PENDING') ?? null;
-  const actor = pendingStep?.level === 'FINANCE' ? FINANCE : SALES_MANAGER;
+  // A step belongs to one level of the chain: the signed-in role either owns
+  // this step or it does not, and the API refuses the decision either way.
+  const canDecide = pendingStep !== null && user?.role === pendingStep.level;
 
   async function decide(decision: 'approve' | 'reject' | 'return') {
     setBusy(true);
-    const response = await decideApproval(id, decision, {
-      actorUserId: actor.id,
-      reason: reason.trim() || null,
-    });
+    const response = await decideApproval(id, decision, { reason: reason.trim() || null });
     setBusy(false);
 
     if (response.error) {
@@ -94,7 +93,7 @@ export default function ApprovalDetail() {
       breadcrumb={['DealFlow360', 'Approvals', approval.number]}
       title={`${approval.number} — ${approval.customer.name}`}
       actions={
-        pendingStep ? (
+        pendingStep && canDecide ? (
           <>
             <Button variant="secondary" onClick={() => void decide('return')} disabled={busy}>
               Return for Revision
@@ -106,6 +105,8 @@ export default function ApprovalDetail() {
               {busy ? 'Working…' : `Approve as ${humanise(pendingStep.level)}`}
             </Button>
           </>
+        ) : pendingStep ? (
+          <Badge variant="critical">Waiting on {humanise(pendingStep.level)}</Badge>
         ) : (
           <Badge variant="neutral">{humanise(approval.status)}</Badge>
         )
@@ -201,11 +202,11 @@ export default function ApprovalDetail() {
         </Table>
       </TableShell>
 
-      {pendingStep && (
+      {pendingStep && canDecide && (
         <Card className="mb-lg">
           <CardLabel>Decision note</CardLabel>
           <p className="mt-xs text-body-sm text-ink-subtle">
-            Recorded on the step and in the audit log. Acting as {actor.fullName}.
+            Recorded on the step and in the audit log, as {user?.fullName}.
           </p>
           <textarea
             value={reason}

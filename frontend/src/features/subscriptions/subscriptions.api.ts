@@ -24,16 +24,16 @@ export function fetchSubscriptionPlans() {
 
 export function changeSubscription(
   id: string,
-  body: { actorUserId: string; subscriptionPlanId?: string | null; quantity?: number | null },
+  body: { subscriptionPlanId?: string | null; quantity?: number | null },
 ) {
   return apiPost<SubscriptionDetailView>(`/subscriptions/${id}/change`, body);
 }
 
-export function cancelSubscription(id: string, body: { actorUserId: string; reason?: string | null }) {
+export function cancelSubscription(id: string, body: { reason?: string | null }) {
   return apiPost<SubscriptionDetailView>(`/subscriptions/${id}/cancel`, body);
 }
 
 /** The demo trigger: bills the open period instead of waiting for a cycle. */
-export function generateSubscriptionInvoice(id: string, actorUserId: string) {
-  return apiPost<InvoiceDetailView>(`/subscriptions/${id}/generate-invoice`, { actorUserId });
+export function generateSubscriptionInvoice(id: string) {
+  return apiPost<InvoiceDetailView>(`/subscriptions/${id}/generate-invoice`, {});
 }

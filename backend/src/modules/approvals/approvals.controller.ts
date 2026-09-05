@@ -2,6 +2,7 @@
 
 import type { Request, Response } from 'express';
 
+import { currentUser } from '../../middleware/auth';
 import * as approvalsService from './approvals.service';
 import type { DecisionBody, ListQuery } from './approvals.schemas';
 
@@ -22,18 +23,33 @@ export async function detail(req: Request, res: Response): Promise<void> {
 
 export async function approve(req: Request, res: Response): Promise<void> {
   const body = req.body as DecisionBody;
-  const quotation = await approvalsService.approve(req.params.id as string, body);
+  const actor = currentUser(req);
+  const quotation = await approvalsService.approve(req.params.id as string, {
+    ...body,
+    actorUserId: actor.id,
+    actorRole: actor.role,
+  });
   res.json({ data: quotation, error: null });
 }
 
 export async function reject(req: Request, res: Response): Promise<void> {
   const body = req.body as DecisionBody;
-  const quotation = await approvalsService.reject(req.params.id as string, body);
+  const actor = currentUser(req);
+  const quotation = await approvalsService.reject(req.params.id as string, {
+    ...body,
+    actorUserId: actor.id,
+    actorRole: actor.role,
+  });
   res.json({ data: quotation, error: null });
 }
 
 export async function returnForRevision(req: Request, res: Response): Promise<void> {
   const body = req.body as DecisionBody;
-  const quotation = await approvalsService.returnForRevision(req.params.id as string, body);
+  const actor = currentUser(req);
+  const quotation = await approvalsService.returnForRevision(req.params.id as string, {
+    ...body,
+    actorUserId: actor.id,
+    actorRole: actor.role,
+  });
   res.json({ data: quotation, error: null });
 }

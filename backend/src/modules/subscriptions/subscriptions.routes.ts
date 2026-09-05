@@ -1,17 +1,18 @@
 import { Router } from 'express';
 
 import { asyncHandler } from '../../lib/async-handler';
+import { auth } from '../../middleware/auth';
+import { requireRole } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
 import * as controller from './subscriptions.controller';
-import {
-  actorSchema,
-  cancelSchema,
-  changeSchema,
-  idParamSchema,
-  listQuerySchema,
-} from './subscriptions.schemas';
+import { cancelSchema, changeSchema, idParamSchema, listQuerySchema } from './subscriptions.schemas';
 
 export const subscriptionsRoutes = Router();
+
+// specs.md §2: reconciling recurring billing and credit notes is Finance's work.
+const runsBilling = requireRole('FINANCE', 'ADMIN');
+
+subscriptionsRoutes.use(auth, runsBilling);
 
 subscriptionsRoutes.get(
   '/subscriptions',
@@ -46,6 +47,5 @@ subscriptionsRoutes.post(
 subscriptionsRoutes.post(
   '/subscriptions/:id/generate-invoice',
   validate('params', idParamSchema),
-  validate('body', actorSchema),
   asyncHandler(controller.generateInvoice),
 );

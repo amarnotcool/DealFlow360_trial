@@ -2,6 +2,7 @@
 
 import type { Request, Response } from 'express';
 
+import { currentUser } from '../../middleware/auth';
 import * as billingService from './billing.service';
 import type { ListQuery, PaymentBody } from './billing.schemas';
 
@@ -31,7 +32,7 @@ export async function orderBilling(req: Request, res: Response): Promise<void> {
 export async function pay(req: Request, res: Response): Promise<void> {
   const body = req.body as PaymentBody;
   const invoice = await billingService.recordPayment(req.params.id as string, {
-    actorUserId: body.actorUserId,
+    actorUserId: currentUser(req).id,
     amount: body.amount,
     method: body.method,
     reference: body.reference ?? null,

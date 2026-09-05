@@ -19,7 +19,7 @@ export function fetchInvoice(id: string) {
 
 export function recordPayment(
   id: string,
-  body: { actorUserId: string; amount: number; method: PaymentMethodValue; reference?: string | null },
+  body: { amount: number; method: PaymentMethodValue; reference?: string | null },
 ) {
   return apiPost<InvoiceDetailView>(`/invoices/${id}/pay`, body);
 }

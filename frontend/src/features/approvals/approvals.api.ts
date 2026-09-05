@@ -15,7 +15,7 @@ type Decision = 'approve' | 'reject' | 'return';
 export function decideApproval(
   quotationId: string,
   decision: Decision,
-  body: { actorUserId: string; reason?: string | null },
+  body: { reason?: string | null },
 ) {
   return apiPost<unknown>(`/approvals/${quotationId}/${decision}`, body);
 }

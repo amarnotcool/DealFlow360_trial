@@ -31,7 +31,6 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { SALES_REP } from '../../../config/current-user';
 import {
   addQuotationLine,
   confirmQuotation,
@@ -90,7 +89,6 @@ export default function QuotationDetail() {
 
     setRecalculatingLineId(line.id);
     const response = await updateQuotationLine(id, line.id, {
-      actorUserId: SALES_REP.id,
       discountPct: next,
     });
     setRecalculatingLineId(null);
@@ -113,7 +111,6 @@ export default function QuotationDetail() {
 
     setBusy(true);
     const response = await addQuotationLine(id, {
-      actorUserId: SALES_REP.id,
       productId,
       quantity: 1,
       discountPct: 0,
@@ -130,7 +127,7 @@ export default function QuotationDetail() {
 
   async function handleDeleteLine(lineId: string) {
     setBusy(true);
-    const response = await deleteQuotationLine(id, lineId, SALES_REP.id);
+    const response = await deleteQuotationLine(id, lineId);
     setBusy(false);
 
     if (response.data) {
@@ -142,7 +139,7 @@ export default function QuotationDetail() {
 
   async function handleSubmit() {
     setBusy(true);
-    const response = await submitQuotation(id, SALES_REP.id);
+    const response = await submitQuotation(id);
     setBusy(false);
 
     if (!response.data) {
@@ -163,7 +160,7 @@ export default function QuotationDetail() {
   /** Approve → confirm → fulfill: confirming turns the quote into a sales order. */
   async function handleConfirm() {
     setBusy(true);
-    const response = await confirmQuotation(id, SALES_REP.id);
+    const response = await confirmQuotation(id);
     setBusy(false);
 
     if (!response.data) {

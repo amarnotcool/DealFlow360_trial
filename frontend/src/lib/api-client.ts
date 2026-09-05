@@ -6,6 +6,41 @@ import type { ApiError, ApiResponse } from '@dealflow360/shared';
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
+// The session token lives here so every request carries it without each feature
+// module having to know about auth. AuthContext is what writes it.
+const TOKEN_KEY = 'dealflow360.token';
+
+let token: string | null = readStoredToken();
+
+function readStoredToken(): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    // Storage can be blocked; the session then lasts only as long as the tab.
+    return null;
+  }
+}
+
+export function setAuthToken(next: string | null): void {
+  token = next;
+  try {
+    if (next) window.localStorage.setItem(TOKEN_KEY, next);
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignored for the same reason as above.
+  }
+}
+
+export function getAuthToken(): string | null {
+  return token;
+}
+
+/**
+ * A rejected session is an app-wide event, not one screen's error: the provider
+ * listens for this and drops the user back at the login page.
+ */
+export const SESSION_EXPIRED_EVENT = 'dealflow360:session-expired';
+
 /** Network and parse failures are reported in the same envelope as API errors. */
 function transportError(message: string): ApiError {
   return { code: 'NETWORK_ERROR', message };
@@ -14,11 +49,20 @@ function transportError(message: string): ApiError {
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
       ...init,
     });
 
     const body = (await response.json()) as ApiResponse<T>;
+
+    if (response.status === 401) {
+      setAuthToken(null);
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
 
     if (!response.ok && body.error === null) {
       return { data: null, error: { code: `HTTP_${response.status}`, message: response.statusText } };

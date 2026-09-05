@@ -24,7 +24,6 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { FINANCE } from '../../../config/current-user';
 import { fetchInvoice, recordPayment } from '../../../features/invoices/invoices.api';
 import { date, dateTime, humanise, money } from '../../../lib/format';
 import { ProgressTimeline } from './components/ProgressTimeline';
@@ -123,7 +122,6 @@ export default function InvoiceDetail() {
 
     setBusy(true);
     const response = await recordPayment(id, {
-      actorUserId: FINANCE.id,
       amount: value,
       method,
       reference: reference.trim() || null,
@@ -263,8 +261,8 @@ export default function InvoiceDetail() {
         <Card className="mb-lg">
           <CardLabel>Record payment</CardLabel>
           <p className="mt-xs text-body-sm text-ink-subtle">
-            Recorded as {FINANCE.fullName}. A payment larger than the {money(invoice.balanceAmount)} outstanding
-            is refused by the API.
+            Recorded against the signed-in user. A payment larger than the{' '}
+            {money(invoice.balanceAmount)} outstanding is refused by the API.
           </p>
           <div className="mt-md flex flex-wrap items-end gap-md">
             <label className="flex flex-col gap-2xs">

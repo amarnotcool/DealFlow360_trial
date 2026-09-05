@@ -29,7 +29,6 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { SALES_REP } from '../../../config/current-user';
 import {
   acceptSplit,
   fetchFulfillmentOrder,
@@ -117,7 +116,7 @@ export default function FulfillmentDetail() {
     let suggestionId = suggestion?.status === 'SUGGESTED' ? suggestion.id : null;
 
     if (!suggestionId) {
-      const generated = await suggestSplit(id, SALES_REP.id);
+      const generated = await suggestSplit(id);
       if (!generated.data) {
         setBusy(false);
         setError(generated.error);
@@ -128,7 +127,7 @@ export default function FulfillmentDetail() {
     setBusy(false);
 
     await run(
-      () => acceptSplit(id, SALES_REP.id, suggestionId),
+      () => acceptSplit(id, suggestionId),
       'Split accepted — stock reserved and shipments created.',
     );
   }
@@ -154,7 +153,7 @@ export default function FulfillmentDetail() {
     }
 
     await run(
-      () => overrideSplit(id, { actorUserId: SALES_REP.id, reason: reason.trim() || null, allocations }),
+      () => overrideSplit(id, { reason: reason.trim() || null, allocations }),
       'Manual override applied — stock reserved as entered.',
     );
     setReason('');
@@ -207,7 +206,7 @@ export default function FulfillmentDetail() {
               <Button
                 onClick={() =>
                   void run(
-                    () => shipFulfillments(id, SALES_REP.id),
+                    () => shipFulfillments(id),
                     'Shipped — a one-time invoice was raised for the shipped quantities only.',
                   )
                 }
@@ -225,7 +224,7 @@ export default function FulfillmentDetail() {
           <>
             <Button
               variant="secondary"
-              onClick={() => void run(() => suggestSplit(id, SALES_REP.id), 'Split suggested from live stock.')}
+              onClick={() => void run(() => suggestSplit(id), 'Split suggested from live stock.')}
               disabled={busy}
             >
               {suggestion ? 'Re-suggest split' : 'Suggest split'}
@@ -420,7 +419,7 @@ export default function FulfillmentDetail() {
         <Card className="mb-lg">
           <CardLabel>Override reason</CardLabel>
           <p className="mt-xs text-body-sm text-ink-subtle">
-            Written to the audit log as MANUAL_OVERRIDE, with {SALES_REP.fullName} as the actor.
+            Written to the audit log as MANUAL_OVERRIDE, with the signed-in user as the actor.
           </p>
           <textarea
             value={reason}

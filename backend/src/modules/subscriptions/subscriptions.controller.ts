@@ -2,9 +2,10 @@
 
 import type { Request, Response } from 'express';
 
+import { currentUser } from '../../middleware/auth';
 import { generateRecurringInvoice } from '../billing/billing.service';
 import * as subscriptionsService from './subscriptions.service';
-import type { ActorBody, CancelBody, ChangeBody, ListQuery } from './subscriptions.schemas';
+import type { CancelBody, ChangeBody, ListQuery } from './subscriptions.schemas';
 
 export async function list(req: Request, res: Response): Promise<void> {
   const query = req.query as unknown as ListQuery;
@@ -30,7 +31,7 @@ export async function detail(req: Request, res: Response): Promise<void> {
 export async function change(req: Request, res: Response): Promise<void> {
   const body = req.body as ChangeBody;
   const subscription = await subscriptionsService.changeSubscription(req.params.id as string, {
-    actorUserId: body.actorUserId,
+    actorUserId: currentUser(req).id,
     subscriptionPlanId: body.subscriptionPlanId ?? null,
     quantity: body.quantity ?? null,
     effectiveDate: body.effectiveDate ?? null,
@@ -43,7 +44,7 @@ export async function change(req: Request, res: Response): Promise<void> {
 export async function cancel(req: Request, res: Response): Promise<void> {
   const body = req.body as CancelBody;
   const subscription = await subscriptionsService.cancelSubscription(req.params.id as string, {
-    actorUserId: body.actorUserId,
+    actorUserId: currentUser(req).id,
     reason: body.reason ?? null,
     effectiveDate: body.effectiveDate ?? null,
   });
@@ -53,7 +54,6 @@ export async function cancel(req: Request, res: Response): Promise<void> {
 
 /** The demo trigger: bills the open period instead of waiting for a cron. */
 export async function generateInvoice(req: Request, res: Response): Promise<void> {
-  const { actorUserId } = req.body as ActorBody;
-  const invoice = await generateRecurringInvoice(req.params.id as string, actorUserId);
+  const invoice = await generateRecurringInvoice(req.params.id as string, currentUser(req).id);
   res.status(201).json({ data: invoice, error: null });
 }

@@ -21,9 +21,15 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { DEFAULT_CUSTOMER_ID, SALES_REP } from '../../../config/current-user';
 import { createQuotation, fetchQuotations } from '../../../features/quotations/quotations.api';
 import { humanise, money } from '../../../lib/format';
+
+/**
+ * The customer a new draft opens against. A customer picker is a later module;
+ * until it exists this is the seeded account, and it is the only placeholder
+ * left on this screen — the owner and the actor both come from the session.
+ */
+const DEFAULT_CUSTOMER_ID = '88888888-8888-4888-8888-000000000002';
 
 /** The stages specs.md §6 groups the list by. */
 const STAGES: Array<{ label: string; value: QuotationStatus | 'ALL' }> = [
@@ -59,12 +65,7 @@ export default function QuotationsList() {
 
   async function handleNewQuotation() {
     setCreating(true);
-    const response = await createQuotation({
-      customerId: DEFAULT_CUSTOMER_ID,
-      ownerUserId: SALES_REP.id,
-      actorUserId: SALES_REP.id,
-      lines: [],
-    });
+    const response = await createQuotation({ customerId: DEFAULT_CUSTOMER_ID, lines: [] });
     setCreating(false);
 
     if (response.data) {

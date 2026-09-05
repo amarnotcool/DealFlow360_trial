@@ -2,8 +2,9 @@
 
 import type { Request, Response } from 'express';
 
+import { currentUser } from '../../middleware/auth';
 import * as fulfillmentService from './fulfillment.service';
-import type { AcceptBody, ListQuery, OverrideBody, SuggestBody } from './fulfillment.schemas';
+import type { AcceptBody, ListQuery, OverrideBody } from './fulfillment.schemas';
 
 export async function list(req: Request, res: Response): Promise<void> {
   const query = req.query as unknown as ListQuery;
@@ -21,15 +22,14 @@ export async function detail(req: Request, res: Response): Promise<void> {
 }
 
 export async function suggest(req: Request, res: Response): Promise<void> {
-  const { actorUserId } = req.body as SuggestBody;
-  const order = await fulfillmentService.suggestSplit(req.params.id as string, actorUserId);
+  const order = await fulfillmentService.suggestSplit(req.params.id as string, currentUser(req).id);
   res.status(201).json({ data: order, error: null });
 }
 
 export async function accept(req: Request, res: Response): Promise<void> {
   const body = req.body as AcceptBody;
   const order = await fulfillmentService.acceptSplit(req.params.id as string, {
-    actorUserId: body.actorUserId,
+    actorUserId: currentUser(req).id,
     suggestionId: body.suggestionId ?? null,
   });
   res.json({ data: order, error: null });
@@ -38,7 +38,7 @@ export async function accept(req: Request, res: Response): Promise<void> {
 export async function override(req: Request, res: Response): Promise<void> {
   const body = req.body as OverrideBody;
   const order = await fulfillmentService.overrideSplit(req.params.id as string, {
-    actorUserId: body.actorUserId,
+    actorUserId: currentUser(req).id,
     reason: body.reason ?? null,
     allocations: body.allocations,
   });
@@ -46,7 +46,6 @@ export async function override(req: Request, res: Response): Promise<void> {
 }
 
 export async function ship(req: Request, res: Response): Promise<void> {
-  const { actorUserId } = req.body as SuggestBody;
-  const order = await fulfillmentService.shipFulfillments(req.params.id as string, actorUserId);
+  const order = await fulfillmentService.shipFulfillments(req.params.id as string, currentUser(req).id);
   res.json({ data: order, error: null });
 }

@@ -1,10 +1,11 @@
 // Approval decisions. The chain itself was built by the quotations module from
 // the discount engine's result; this module only walks it.
 
-import { ApprovalStepStatus, AuditAction, Prisma, QuotationStatus } from '@prisma/client';
+import { ApprovalLevel, ApprovalStepStatus, AuditAction, Prisma, QuotationStatus } from '@prisma/client';
+import type { RoleCode } from '@dealflow360/shared';
 
 import { prisma } from '../../lib/prisma-client';
-import { ConflictError, NotFoundError } from '../../lib/errors';
+import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors';
 import { recordAudit } from '../../shared/audit/audit.service';
 import { getQuotation } from '../quotations/quotations.service';
 
@@ -168,12 +169,34 @@ async function loadPendingStep(tx: Prisma.TransactionClient, quotationId: string
 
 export interface DecisionInput {
   actorUserId: string;
+  /** The role the deciding session carries, checked against the step's level. */
+  actorRole: RoleCode;
   reason?: string | null;
+}
+
+/** The role that a step of each level is waiting on. */
+const LEVEL_ROLE: Record<ApprovalLevel, RoleCode> = {
+  [ApprovalLevel.SALES_MANAGER]: 'SALES_MANAGER',
+  [ApprovalLevel.FINANCE]: 'FINANCE',
+};
+
+/**
+ * A step belongs to one level of the chain, so only that level decides it: a
+ * manager cannot sign off the finance step of a high-risk quote, and finance
+ * cannot stand in for the manager step ahead of it.
+ */
+function assertCanDecide(level: ApprovalLevel, actorRole: RoleCode): void {
+  if (LEVEL_ROLE[level] !== actorRole) {
+    throw new ForbiddenError(
+      `This step needs ${LEVEL_ROLE[level]} — ${actorRole} cannot decide it`,
+    );
+  }
 }
 
 export async function approve(quotationId: string, input: DecisionInput) {
   await prisma.$transaction(async (tx) => {
     const { quotation, step } = await loadPendingStep(tx, quotationId);
+    assertCanDecide(step.level, input.actorRole);
 
     await tx.approvalStep.update({
       where: { id: step.id },
@@ -216,6 +239,7 @@ export async function approve(quotationId: string, input: DecisionInput) {
 export async function reject(quotationId: string, input: DecisionInput) {
   await prisma.$transaction(async (tx) => {
     const { step } = await loadPendingStep(tx, quotationId);
+    assertCanDecide(step.level, input.actorRole);
 
     await tx.approvalStep.update({
       where: { id: step.id },
@@ -255,6 +279,7 @@ export async function reject(quotationId: string, input: DecisionInput) {
 export async function returnForRevision(quotationId: string, input: DecisionInput) {
   await prisma.$transaction(async (tx) => {
     const { step } = await loadPendingStep(tx, quotationId);
+    assertCanDecide(step.level, input.actorRole);
 
     await tx.approvalStep.update({
       where: { id: step.id },

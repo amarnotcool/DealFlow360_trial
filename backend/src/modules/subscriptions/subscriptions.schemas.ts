@@ -1,8 +1,7 @@
 import { SubscriptionStatus } from '@prisma/client';
 import { z } from 'zod';
 
-/** Same auth placeholder the other modules document: TODO(auth). */
-const actorUserId = z.string().uuid();
+// The acting user comes from the session, so no schema carries an actor field.
 
 export const listQuerySchema = z.object({
   status: z.nativeEnum(SubscriptionStatus).optional(),
@@ -15,7 +14,6 @@ export const idParamSchema = z.object({ id: z.string().uuid() });
 
 export const changeSchema = z
   .object({
-    actorUserId,
     subscriptionPlanId: z.string().uuid().nullish(),
     quantity: z.number().positive().nullish(),
     effectiveDate: z.string().datetime().nullish(),
@@ -27,11 +25,8 @@ export const changeSchema = z
 export type ChangeBody = z.infer<typeof changeSchema>;
 
 export const cancelSchema = z.object({
-  actorUserId,
   reason: z.string().min(1).nullish(),
   effectiveDate: z.string().datetime().nullish(),
 });
 export type CancelBody = z.infer<typeof cancelSchema>;
 
-export const actorSchema = z.object({ actorUserId });
-export type ActorBody = z.infer<typeof actorSchema>;

@@ -1,8 +1,7 @@
 import { InvoiceStatus, InvoiceType, PaymentMethod } from '@prisma/client';
 import { z } from 'zod';
 
-/** Same auth placeholder the other modules document: TODO(auth). */
-const actorUserId = z.string().uuid();
+// The acting user comes from the session, so no schema carries an actor field.
 
 export const listQuerySchema = z.object({
   status: z.nativeEnum(InvoiceStatus).optional(),
@@ -15,7 +14,6 @@ export type ListQuery = z.infer<typeof listQuerySchema>;
 export const idParamSchema = z.object({ id: z.string().uuid() });
 
 export const paymentSchema = z.object({
-  actorUserId,
   amount: z.number().positive(),
   method: z.nativeEnum(PaymentMethod).default(PaymentMethod.BANK_TRANSFER),
   reference: z.string().min(1).nullish(),
