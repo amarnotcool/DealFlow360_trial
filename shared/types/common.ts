@@ -27,3 +27,23 @@ export enum GatewayTransactionStatus {
   FAILED = 'FAILED',
   REFUNDED = 'REFUNDED',
 }
+
+/**
+ * Every endpoint answers in this envelope (CLAUDE.md, API conventions).
+ * `data` carries the payload on success, `error` on failure — never both.
+ */
+export interface ApiError {
+  code: string;
+  message: string;
+}
+
+export interface ApiResponse<T> {
+  data: T | null;
+  error: ApiError | null;
+}
+
+/** Payload of GET /health — a liveness probe, it touches no database. */
+export interface HealthStatus {
+  status: 'ok';
+  timestamp: string;
+}
