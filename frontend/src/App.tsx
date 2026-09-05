@@ -23,6 +23,8 @@ import SubscriptionDetail from './pages/internal/subscriptions/SubscriptionDetai
 import SubscriptionsList from './pages/internal/subscriptions/SubscriptionsList';
 import UserDetail from './pages/internal/users/UserDetail';
 import UsersList from './pages/internal/users/UsersList';
+import WarehouseDetail from './pages/internal/warehouses/WarehouseDetail';
+import WarehousesList from './pages/internal/warehouses/WarehousesList';
 import Preview from './pages/Preview';
 import SystemStatus from './pages/SystemStatus';
 import PortalRoutes from './routes/portal-routes';
@@ -177,6 +179,25 @@ export default function App() {
           <RequireRole allow={ADMIN_ONLY}>
             <UserDetail />
           </RequireRole>
+        }
+      />
+
+      {/* Stock is readable by everyone who quotes from it; moving it is
+          finance and admin work, which the API enforces on its own. */}
+      <Route
+        path="/warehouses"
+        element={
+          <RequireAuth>
+            <WarehousesList />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/warehouses/:id"
+        element={
+          <RequireAuth>
+            <WarehouseDetail />
+          </RequireAuth>
         }
       />
 

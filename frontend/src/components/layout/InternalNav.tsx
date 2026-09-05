@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Deal Health', to: '/deal-health', enabled: false, roles: APPROVALS_ROLES, icon: <Glyph d="M3 12h4l2 6 4-14 2 8h6" /> },
   { label: 'Reports', to: '/reports', enabled: false, roles: APPROVALS_ROLES, icon: <Glyph d="M4 20V9M10 20V4M16 20v-7M22 20H2" /> },
   { label: 'Products', to: '/products', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /> },
+  { label: 'Warehouses', to: '/warehouses', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M3 10.5 12 4l9 6.5V20H3zM9 20v-6h6v6" /> },
   { label: 'Customers', to: '/customers', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M17 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9.5 10a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM22 20v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8" /> },
   { label: 'Staff Users', to: '/users', enabled: true, roles: ADMIN_ONLY, icon: <Glyph d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1M18 8h4M20 6v4" /> },
 ];

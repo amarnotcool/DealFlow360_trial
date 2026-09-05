@@ -1,5 +1,7 @@
 import type {
+  BackorderConsolidationResult,
   FulfillmentDetailView,
+  OpenBackorderView,
   SalesOrderListItem,
   WarehouseStockView,
 } from '@dealflow360/shared';
@@ -48,4 +50,30 @@ export function overrideSplit(
  */
 export function shipFulfillments(salesOrderId: string) {
   return apiPost<FulfillmentDetailView>(`/fulfillment/${salesOrderId}/ship`, {});
+}
+
+export interface BackorderQuery {
+  salesOrderId?: string;
+  /** Resolved and cancelled backorders are hidden unless asked for. */
+  includeResolved?: boolean;
+}
+
+export function fetchBackorders(query: BackorderQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.salesOrderId) params.set('salesOrderId', query.salesOrderId);
+  if (query.includeResolved) params.set('includeResolved', 'true');
+
+  const encoded = params.toString();
+  return apiList<OpenBackorderView>(`/backorders${encoded ? `?${encoded}` : ''}`);
+}
+
+/**
+ * Runs the allocator again over what the order still has on backorder. It
+ * reserves whatever stock has arrived since; shipping stays a separate step.
+ */
+export function consolidateBackorders(salesOrderId: string, reason?: string | null) {
+  return apiPost<BackorderConsolidationResult>(
+    `/fulfillment/${salesOrderId}/consolidate-backorders`,
+    { reason: reason ?? null },
+  );
 }

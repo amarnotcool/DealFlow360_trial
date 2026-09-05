@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type {
   ApiError,
+  BackorderConsolidationResult,
   FulfillmentDetailView,
   SuggestedSplitLine,
   WarehouseStockView,
@@ -31,6 +32,7 @@ import {
 } from '../../../components/ui';
 import {
   acceptSplit,
+  consolidateBackorders,
   fetchFulfillmentOrder,
   fetchFulfillmentOrders,
   overrideSplit,
@@ -38,7 +40,9 @@ import {
   suggestSplit,
 } from '../../../features/fulfillment/fulfillment.api';
 import type { OverrideAllocation } from '../../../features/fulfillment/fulfillment.api';
+import { useAuth } from '../../../features/auth/useAuth';
 import { humanise, money } from '../../../lib/format';
+import { INVENTORY_ROLES } from '../../../routes/access';
 
 const SKIPPED_REASON: Record<string, string> = {
   NOT_STOCK_TRACKED: 'Not stock tracked — nothing to ship',
@@ -67,6 +71,10 @@ function seedDraft(lines: SuggestedSplitLine[]): OverrideDraft {
 export default function FulfillmentDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Finance and Ops decide where an order ships from (specs.md §2); the API
+  // guards the endpoint itself.
+  const canConsolidate = user ? INVENTORY_ROLES.includes(user.role) : false;
 
   const [order, setOrder] = useState<FulfillmentDetailView | null>(null);
   const [warehouses, setWarehouses] = useState<WarehouseStockView[]>([]);
@@ -76,6 +84,7 @@ export default function FulfillmentDetail() {
   const [draft, setDraft] = useState<OverrideDraft>({});
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [consolidation, setConsolidation] = useState<BackorderConsolidationResult | null>(null);
 
   const load = useCallback(async () => {
     const [detail, list] = await Promise.all([fetchFulfillmentOrder(id), fetchFulfillmentOrders()]);
@@ -130,6 +139,31 @@ export default function FulfillmentDetail() {
       () => acceptSplit(id, suggestionId),
       'Split accepted — stock reserved and shipments created.',
     );
+  }
+
+  /**
+   * specs.md §4: once stock arrives, the remaining backorder is consolidated
+   * into new shipments. The API answers with what it could allocate, including
+   * "nothing arrived yet", and that answer is what the card reports.
+   */
+  async function handleConsolidate() {
+    setBusy(true);
+    setError(null);
+    const response = await consolidateBackorders(id);
+    setBusy(false);
+
+    if (!response.data) {
+      setError(response.error);
+      return;
+    }
+
+    setConsolidation(response.data);
+    setNotice(
+      response.data.fulfillmentIds.length === 0
+        ? 'Nothing to consolidate yet — no stock has arrived for what is short.'
+        : 'Backorder consolidated — stock reserved and shipments created.',
+    );
+    await load();
   }
 
   function handleOverrideStart() {
@@ -466,9 +500,35 @@ export default function FulfillmentDetail() {
               );
             })}
           </ul>
-          <p className="mt-md text-body-sm opacity-80">
-            Consolidating a backorder when stock arrives is the next module.
-          </p>
+
+          {consolidation && (
+            <p className="mt-md text-body-md">
+              {consolidation.fulfillmentIds.length === 0
+                ? `No stock has arrived yet — ${qty(consolidation.totalStillShort)} still short.`
+                : `Consolidated ${qty(consolidation.totalAllocated)} into ${
+                    consolidation.fulfillmentIds.length
+                  } shipment(s); ${
+                    Number(consolidation.totalStillShort) === 0
+                      ? 'nothing is short any more.'
+                      : `${qty(consolidation.totalStillShort)} still short.`
+                  }`}
+            </p>
+          )}
+
+          {canConsolidate ? (
+            <div className="mt-md flex flex-wrap items-center gap-sm">
+              <Button variant="obsidian" onClick={handleConsolidate} disabled={busy}>
+                {busy ? 'Working…' : 'Consolidate Remaining Backorder'}
+              </Button>
+              <span className="text-body-sm opacity-80">
+                Runs the allocator again over what is short and reserves whatever stock has arrived.
+              </span>
+            </div>
+          ) : (
+            <p className="mt-md text-body-sm opacity-80">
+              Finance consolidates a backorder once stock arrives.
+            </p>
+          )}
         </Card>
       )}
     </InternalLayout>

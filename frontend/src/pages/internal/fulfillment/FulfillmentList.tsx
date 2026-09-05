@@ -5,7 +5,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ApiError, SalesOrderListItem, WarehouseStockView } from '@dealflow360/shared';
+import type {
+  ApiError,
+  OpenBackorderView,
+  SalesOrderListItem,
+  WarehouseStockView,
+} from '@dealflow360/shared';
 
 import { InternalLayout } from '../../../components/layout/InternalLayout';
 import {
@@ -22,8 +27,11 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
-import { fetchFulfillmentOrders } from '../../../features/fulfillment/fulfillment.api';
-import { humanise, money } from '../../../lib/format';
+import {
+  fetchBackorders,
+  fetchFulfillmentOrders,
+} from '../../../features/fulfillment/fulfillment.api';
+import { date, humanise, money } from '../../../lib/format';
 
 const qty = (value: string): string => String(Number(value));
 
@@ -87,14 +95,22 @@ export default function FulfillmentList() {
   const [warehouses, setWarehouses] = useState<WarehouseStockView[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<ApiError | null>(null);
+  // What every order is still short, across the whole book: the queue a stock
+  // receipt clears. Each row opens the order that consolidates it.
+  const [backorders, setBackorders] = useState<OpenBackorderView[] | null>(null);
 
   const load = useCallback(async () => {
     setRows(null);
-    const response = await fetchFulfillmentOrders();
+    setBackorders(null);
+    const [response, shortfalls] = await Promise.all([
+      fetchFulfillmentOrders(),
+      fetchBackorders(),
+    ]);
     setRows(response.data ?? []);
     setWarehouses(response.meta?.warehouses ?? []);
     setTotal(response.meta?.total ?? response.data?.length ?? 0);
-    setError(response.error);
+    setBackorders(shortfalls.data ?? []);
+    setError(response.error ?? shortfalls.error);
   }, []);
 
   useEffect(() => {
@@ -180,6 +196,76 @@ export default function FulfillmentList() {
                       )}
                     </div>
                   </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </TableShell>
+
+      <TableShell className="mt-lg">
+        <TableToolbar>
+          <div>
+            <h2 className="text-title-md text-ink">Open backorders</h2>
+            <p className="text-body-sm text-ink-subtle">
+              What stock could not cover. Open the order to consolidate it once stock arrives.
+            </p>
+          </div>
+          <Badge variant={backorders && backorders.length > 0 ? 'critical' : 'neutral'}>
+            {backorders ? `${backorders.length} open` : '—'}
+          </Badge>
+        </TableToolbar>
+
+        {backorders === null ? (
+          <div className="p-lg">
+            <LoadingCard label="Backorders" />
+          </div>
+        ) : backorders.length === 0 ? (
+          <div className="p-lg">
+            <EmptyCard message="Nothing on backorder — every confirmed line is covered by stock." />
+          </div>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Order</Th>
+                <Th>Item</Th>
+                <Th className="text-right">Short</Th>
+                <Th className="text-right">Resolved</Th>
+                <Th>Status</Th>
+                <Th>Opened</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {backorders.map((backorder) => (
+                <Tr
+                  key={backorder.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/fulfillment/${backorder.salesOrder.id}`)}
+                >
+                  <Td className="font-semibold text-ink">
+                    <span className="block">{backorder.salesOrder.number}</span>
+                    <span className="block text-label-md font-normal text-ink-subtle">
+                      {backorder.customer.name}
+                    </span>
+                  </Td>
+                  <Td>
+                    <span className="block text-ink">{backorder.salesOrderLine.product.name}</span>
+                    <span className="block text-label-md text-ink-subtle">
+                      {backorder.salesOrderLine.productVariant?.sku ??
+                        backorder.salesOrderLine.product.sku}
+                    </span>
+                  </Td>
+                  <Td numeric className="text-danger">
+                    {qty(backorder.outstanding)}
+                  </Td>
+                  <Td numeric>{qty(backorder.quantityResolved)}</Td>
+                  <Td>
+                    <Badge variant={backorder.status === 'OPEN' ? 'critical' : 'primary'}>
+                      {humanise(backorder.status)}
+                    </Badge>
+                  </Td>
+                  <Td className="text-ink-subtle">{date(backorder.createdAt)}</Td>
                 </Tr>
               ))}
             </tbody>
