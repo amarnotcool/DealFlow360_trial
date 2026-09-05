@@ -1,9 +1,61 @@
-:root {
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Atmospheric canvas (DESIGN.md, Level 0) with soft amber and chartreuse
+       light bleeds over the base gradient. */
+    background-color: #eae8e3;
+    background-image:
+      radial-gradient(60rem 40rem at 8% -10%, rgba(233, 240, 52, 0.16), transparent 60%),
+      radial-gradient(50rem 36rem at 100% 8%, rgba(245, 143, 84, 0.13), transparent 60%),
+      linear-gradient(135deg, #eae8e3 0%, #e5e3dd 100%);
+    background-attachment: fixed;
+  }
+
+  body {
+    @apply font-sans text-body-md text-ink-body antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-ink;
+  }
+
+  /* Monetary and metric figures align vertically across data grids. */
+  th,
+  td,
+  .tabular {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
 }
 
-body {
-  margin: 0;
-  padding: 2rem;
+@layer components {
+  /* Level 1 substrate: frosted translucent card. */
+  .frost {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 8px 32px -4px rgba(20, 21, 23, 0.04);
+  }
+
+  /* The navigation rail sits at a lighter frost than substrate cards. */
+  .frost-rail {
+    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+  }
+
+  .frost-input {
+    background-color: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+  }
 }
