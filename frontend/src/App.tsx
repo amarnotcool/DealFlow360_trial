@@ -8,6 +8,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import ApprovalDetail from './pages/internal/approvals/ApprovalDetail';
 import ApprovalsList from './pages/internal/approvals/ApprovalsList';
+import DealHealthDashboard from './pages/internal/deal-health/DealHealthDashboard';
 import CustomerDetail from './pages/internal/customers/CustomerDetail';
 import CustomersList from './pages/internal/customers/CustomersList';
 import Login from './pages/auth/Login';
@@ -198,6 +199,17 @@ export default function App() {
           <RequireAuth>
             <WarehouseDetail />
           </RequireAuth>
+        }
+      />
+
+      {/* The approvals desk watches deal health too (specs.md §2); a rep
+          never sees the board. */}
+      <Route
+        path="/deal-health"
+        element={
+          <RequireRole allow={APPROVALS_ROLES}>
+            <DealHealthDashboard />
+          </RequireRole>
         }
       />
 
