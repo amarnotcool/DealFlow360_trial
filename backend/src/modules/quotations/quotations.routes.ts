@@ -56,3 +56,10 @@ quotationsRoutes.post(
   validate('body', actorSchema),
   asyncHandler(controller.submit),
 );
+
+quotationsRoutes.post(
+  '/quotations/:id/confirm',
+  validate('params', idParamSchema),
+  validate('body', actorSchema),
+  asyncHandler(controller.confirm),
+);

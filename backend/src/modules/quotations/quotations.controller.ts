@@ -65,3 +65,9 @@ export async function submit(req: Request, res: Response): Promise<void> {
   const quotation = await quotationsService.submitQuotation(req.params.id as string, actorUserId);
   res.json({ data: quotation, error: null });
 }
+
+export async function confirm(req: Request, res: Response): Promise<void> {
+  const { actorUserId } = req.body as ActorBody;
+  const salesOrder = await quotationsService.confirmQuotation(req.params.id as string, actorUserId);
+  res.status(201).json({ data: salesOrder, error: null });
+}

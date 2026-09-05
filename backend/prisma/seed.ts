@@ -106,7 +106,17 @@ const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync('dealflow360', 10);
 
 async function main() {
   await prisma.$transaction(async (tx) => {
-    // Wipe in FK-safe order (children first).
+    // Wipe in FK-safe order (children first). Order and fulfillment rows are
+    // written by the running app (POST /quotations/:id/confirm and the
+    // fulfillment module), so a reseed has to clear them too.
+    await tx.auditLog.deleteMany();
+    await tx.backorder.deleteMany();
+    await tx.fulfillment.deleteMany();
+    await tx.fulfillmentSplitSuggestion.deleteMany();
+    await tx.salesOrderLine.deleteMany();
+    await tx.salesOrder.deleteMany();
+    await tx.approvalStep.deleteMany();
+    await tx.riskScoreFactor.deleteMany();
     await tx.quotationLine.deleteMany();
     await tx.quotation.deleteMany();
     await tx.inventoryStock.deleteMany();
