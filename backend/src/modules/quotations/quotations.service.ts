@@ -238,20 +238,45 @@ export interface ListQuotationsParams {
 export async function listQuotations(params: ListQuotationsParams) {
   const where: Prisma.QuotationWhereInput = params.status ? { status: params.status } : {};
 
-  const [rows, total] = await Promise.all([
+  const [found, total] = await Promise.all([
     prisma.quotation.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: params.skip,
       take: params.take,
       include: {
-        customer: { select: { id: true, name: true, customerTier: { select: { code: true, name: true } } } },
+        customer: {
+          select: { id: true, name: true, customerTierId: true, customerTier: { select: { code: true, name: true } } },
+        },
         ownerUser: { select: { id: true, fullName: true } },
+        lines: { select: { id: true, categoryId: true, discountPct: true } },
         _count: { select: { lines: true } },
       },
     }),
     prisma.quotation.count({ where }),
   ]);
+
+  // Same rule as the detail read: the badge reflects what the engine currently
+  // makes of the quote, not a stored column that a draft may never have written.
+  const rows = await Promise.all(
+    found.map(async (quotation) => {
+      const categoryIds = [...new Set(quotation.lines.map((line) => line.categoryId))];
+      const ceilings = await loadCeilings(prisma, quotation.customer.customerTierId, categoryIds);
+
+      const risk = computeDiscountRisk({
+        lines: quotation.lines.map((line) => ({
+          lineId: line.id,
+          categoryId: line.categoryId,
+          tierCeilingPct: ceilings.tierCeilingPct,
+          categoryCeilingPct: ceilings.categoryCeilingPct.get(line.categoryId) ?? ceilings.globalDefaultPct,
+          discountPct: line.discountPct.toNumber(),
+        })),
+      });
+
+      const { lines: _lines, ...rest } = quotation;
+      return { ...rest, riskScore: D(risk.blendedScore), riskLevel: risk.riskLevel as PrismaRiskLevel };
+    }),
+  );
 
   return { rows, total };
 }

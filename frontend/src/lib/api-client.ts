@@ -33,3 +33,26 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<A
 export function apiGet<T>(path: string): Promise<ApiResponse<T>> {
   return apiRequest<T>(path, { method: 'GET' });
 }
+
+/** List endpoints add a meta block alongside the envelope. */
+export type ApiListResponse<T, M = { total: number }> = ApiResponse<T[]> & { meta?: M };
+
+export async function apiList<T, M = { total: number }>(path: string): Promise<ApiListResponse<T, M>> {
+  return (await apiRequest<T[]>(path, { method: 'GET' })) as ApiListResponse<T, M>;
+}
+
+function withBody<T>(method: string, path: string, body: unknown): Promise<ApiResponse<T>> {
+  return apiRequest<T>(path, { method, body: JSON.stringify(body) });
+}
+
+export function apiPost<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+  return withBody<T>('POST', path, body);
+}
+
+export function apiPatch<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+  return withBody<T>('PATCH', path, body);
+}
+
+export function apiDelete<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+  return withBody<T>('DELETE', path, body);
+}
