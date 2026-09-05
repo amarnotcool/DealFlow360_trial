@@ -15,6 +15,7 @@ import type {
 } from '@dealflow360/shared';
 
 import { InternalLayout } from '../../../components/layout/InternalLayout';
+import UpsellPanel from './components/UpsellPanel';
 import {
   Badge,
   Button,
@@ -457,6 +458,17 @@ export default function QuotationDetail() {
           </tbody>
         </Table>
       </TableShell>
+
+      {isDraft && (
+        <UpsellPanel
+          quotationId={id}
+          linesKey={quotation.lines.map((line) => line.id).join(',')}
+          onAccepted={(updated) => {
+            setQuotation(updated);
+            setRouting(null);
+          }}
+        />
+      )}
 
       {quotation.approvalSteps.length > 0 && (
         <Card className="mt-lg">

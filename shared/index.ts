@@ -9,6 +9,7 @@ export * from './types/inventory';
 export * from './types/negotiation';
 export * from './types/product';
 export * from './types/quotation';
+export * from './types/recommendation';
 export * from './types/reporting';
 export * from './types/risk-score';
 export * from './types/socket-events';

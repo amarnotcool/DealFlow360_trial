@@ -18,6 +18,7 @@ import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
 import { rbacRoutes } from './modules/rbac/rbac.routes';
+import { recommendationsRoutes } from './modules/recommendations/recommendations.routes';
 import { reportingRoutes } from './modules/reporting/reporting.routes';
 import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes';
 import { warehousesRoutes } from './modules/warehouses/warehouses.routes';
@@ -41,6 +42,7 @@ export function createApp() {
   app.use(warehousesRoutes);
   app.use(inventoryRoutes);
   app.use(quotationsRoutes);
+  app.use(recommendationsRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);
   app.use(dealHealthRoutes);

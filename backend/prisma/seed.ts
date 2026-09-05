@@ -49,6 +49,8 @@ const ID = {
   prodLaptop: '44444444-4444-4444-8444-000000000001',
   prodSetup: '44444444-4444-4444-8444-000000000002',
   prodWarranty: '44444444-4444-4444-8444-000000000003',
+  recLaptopWarranty: '66666666-6666-4666-8666-000000000001',
+  recLaptopSupport: '66666666-6666-4666-8666-000000000002',
   variantLaptop: '44444444-4444-4444-8444-000000000101',
 
   prodSupport: '33333333-3333-4333-8333-000000000004',
@@ -229,6 +231,7 @@ async function main() {
     await tx.warehouse.deleteMany();
     await tx.subscriptionPlan.deleteMany();
     await tx.productVariant.deleteMany();
+    await tx.productRecommendation.deleteMany();
     await tx.product.deleteMany();
     await tx.discountRule.deleteMany();
     await tx.approvalChainRule.deleteMany();
@@ -333,6 +336,17 @@ async function main() {
         name: '16GB/512GB',
         extraPrice: D('0.00'),
       },
+    });
+
+    // --- Recommendations -----------------------------------------------------
+    // A laptop pairs with cover and care. margin_delta is the seed's snapshot
+    // of (list - cost) × 1 — the endpoint recomputes it live and never reads
+    // this column. min_margin_pct 0 means "use the global healthy cutoff".
+    await tx.productRecommendation.createMany({
+      data: [
+        { id: ID.recLaptopWarranty, sourceProductId: ID.prodLaptop, recommendedProductId: ID.prodWarranty, marginDelta: D('10000.00'), minMarginPct: D('0'), promotionTag: 'Frequently paired', rank: 1 },
+        { id: ID.recLaptopSupport, sourceProductId: ID.prodLaptop, recommendedProductId: ID.prodSupport, marginDelta: D('3500.00'), minMarginPct: D('0'), promotionTag: null, rank: 2 },
+      ],
     });
 
     // --- Subscription plan -------------------------------------------------
