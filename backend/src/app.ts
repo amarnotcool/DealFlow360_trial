@@ -10,6 +10,8 @@ import { authRoutes } from './modules/auth/auth.routes';
 import { billingRoutes } from './modules/billing/billing.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
+import { portalRoutes } from './modules/portal/portal.routes';
+import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
 import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes';
 
@@ -28,6 +30,10 @@ export function createApp() {
   app.use(fulfillmentRoutes);
   app.use(subscriptionsRoutes);
   app.use(billingRoutes);
+
+  // The customer portal is a separate surface with its own session (rule 4).
+  app.use(portalAuthRoutes);
+  app.use(portalRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

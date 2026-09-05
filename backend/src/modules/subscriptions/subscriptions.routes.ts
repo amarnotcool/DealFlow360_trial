@@ -12,7 +12,8 @@ export const subscriptionsRoutes = Router();
 // specs.md §2: reconciling recurring billing and credit notes is Finance's work.
 const runsBilling = requireRole('FINANCE', 'ADMIN');
 
-subscriptionsRoutes.use(auth, runsBilling);
+subscriptionsRoutes.use('/subscriptions', auth, runsBilling);
+subscriptionsRoutes.use('/subscription-plans', auth, runsBilling);
 
 subscriptionsRoutes.get(
   '/subscriptions',

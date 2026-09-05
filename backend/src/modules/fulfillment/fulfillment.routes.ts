@@ -13,7 +13,7 @@ export const fulfillmentRoutes = Router();
 // watch their order move, but only Finance decides where it ships from.
 const movesStock = requireRole('FINANCE', 'ADMIN');
 
-fulfillmentRoutes.use(auth);
+fulfillmentRoutes.use('/fulfillment', auth);
 
 // `:id` is a sales_order id — fulfillment anchors on the order, not the quote.
 fulfillmentRoutes.get('/fulfillment', validate('query', listQuerySchema), asyncHandler(controller.list));

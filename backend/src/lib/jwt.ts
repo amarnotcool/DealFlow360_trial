@@ -3,7 +3,7 @@
 // or the other way round.
 
 import jwt from 'jsonwebtoken';
-import type { AuthTokenPayload, RoleCode } from '@dealflow360/shared';
+import type { AuthTokenPayload, PortalTokenPayload, RoleCode } from '@dealflow360/shared';
 
 import { env } from '../config/env';
 import { UnauthorizedError } from './errors';
@@ -32,5 +32,37 @@ export function verifyInternalToken(token: string): AuthTokenPayload {
       throw cause;
     }
     throw new UnauthorizedError('Session token is invalid or has expired');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Portal tokens — signed with portalTokenSecret, so a staff token verified with
+// this secret fails and a portal token verified with the staff secret fails.
+// ---------------------------------------------------------------------------
+
+export function signPortalToken(contactId: string, customerId: string): string {
+  return jwt.sign({ sub: contactId, customerId } satisfies PortalTokenPayload, env.portalTokenSecret, {
+    expiresIn: TOKEN_TTL,
+  });
+}
+
+export function verifyPortalToken(token: string): PortalTokenPayload {
+  try {
+    const decoded = jwt.verify(token, env.portalTokenSecret);
+
+    if (
+      typeof decoded === 'string' ||
+      typeof decoded.sub !== 'string' ||
+      typeof decoded.customerId !== 'string'
+    ) {
+      throw new UnauthorizedError('Portal token is missing its contact or customer');
+    }
+
+    return { sub: decoded.sub, customerId: decoded.customerId };
+  } catch (cause) {
+    if (cause instanceof UnauthorizedError) {
+      throw cause;
+    }
+    throw new UnauthorizedError('Portal session token is invalid or has expired');
   }
 }

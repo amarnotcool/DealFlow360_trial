@@ -10,7 +10,9 @@ import { idParamSchema, listQuerySchema, paymentSchema } from './billing.schemas
 export const billingRoutes = Router();
 
 // Invoices and payments sit with Finance, the same as the subscriptions module.
-billingRoutes.use(auth, requireRole('FINANCE', 'ADMIN'));
+const runsBilling = [auth, requireRole('FINANCE', 'ADMIN')];
+billingRoutes.use('/invoices', ...runsBilling);
+billingRoutes.use('/orders', ...runsBilling);
 
 billingRoutes.get('/invoices', validate('query', listQuerySchema), asyncHandler(controller.list));
 

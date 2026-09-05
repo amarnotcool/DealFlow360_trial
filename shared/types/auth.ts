@@ -29,3 +29,29 @@ export interface AuthTokenPayload {
   sub: string;
   role: RoleCode;
 }
+
+// ---------------------------------------------------------------------------
+// Customer portal session (CLAUDE.md rule 4)
+//
+// A separate surface with a separate secret: a portal token is not a staff
+// token with fewer rights, and neither one is accepted where the other belongs.
+// ---------------------------------------------------------------------------
+
+export interface PortalUser {
+  contactId: string;
+  customerId: string;
+  fullName: string;
+  email: string;
+  customerName: string;
+}
+
+export interface PortalLoginResponse {
+  token: string;
+  user: PortalUser;
+}
+
+/** What the portal JWT carries: the contact and the customer they act for. */
+export interface PortalTokenPayload {
+  sub: string;
+  customerId: string;
+}

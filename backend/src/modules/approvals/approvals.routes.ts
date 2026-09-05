@@ -15,7 +15,7 @@ export const approvalsRoutes = Router();
 const seesDesk = requireRole('SALES_MANAGER', 'FINANCE', 'ADMIN');
 const decides = requireRole('SALES_MANAGER', 'FINANCE');
 
-approvalsRoutes.use(auth);
+approvalsRoutes.use('/approvals', auth);
 
 approvalsRoutes.get('/approvals', seesDesk, validate('query', listQuerySchema), asyncHandler(controller.list));
 

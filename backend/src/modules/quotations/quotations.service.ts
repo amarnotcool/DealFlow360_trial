@@ -558,6 +558,40 @@ async function findAssigneeForLevel(
   return userRole?.userId ?? null;
 }
 
+/**
+ * Rebuilds the approval chain from a risk result: superseded steps are dropped
+ * and a fresh PENDING step is created for every level the engine asked for.
+ *
+ * Both routes into approval use this — the rep submitting a draft, and a portal
+ * negotiation that pushes agreed terms back over a ceiling — so the two can
+ * never drift apart.
+ */
+export async function rebuildApprovalChain(
+  tx: Prisma.TransactionClient,
+  quotationId: string,
+  risk: DiscountEngineResult,
+): Promise<ApprovalLevel[]> {
+  await tx.approvalStep.deleteMany({ where: { quotationId } });
+
+  const levels: ApprovalLevel[] = [];
+
+  for (const step of risk.requiredApprovalChain) {
+    const level = step.level as ApprovalLevel;
+    await tx.approvalStep.create({
+      data: {
+        quotationId,
+        level,
+        sequence: step.sequence,
+        status: ApprovalStepStatus.PENDING,
+        assigneeUserId: await findAssigneeForLevel(tx, level),
+      },
+    });
+    levels.push(level);
+  }
+
+  return levels;
+}
+
 export async function submitQuotation(quotationId: string, actorUserId: string) {
   await prisma.$transaction(async (tx) => {
     const quotation = await tx.quotation.findUnique({
@@ -576,11 +610,10 @@ export async function submitQuotation(quotationId: string, actorUserId: string) 
 
     const risk = await recomputeQuotation(tx, quotationId);
 
-    // Superseded steps from an earlier submit are dropped; the chain is rebuilt
-    // from the score the engine just returned.
-    await tx.approvalStep.deleteMany({ where: { quotationId } });
-
     if (risk.requiredApprovalChain.length === 0) {
+      // Nothing to route: drop any chain an earlier submit left behind.
+      await tx.approvalStep.deleteMany({ where: { quotationId } });
+
       await tx.quotation.update({
         where: { id: quotationId },
         data: {
@@ -602,17 +635,7 @@ export async function submitQuotation(quotationId: string, actorUserId: string) 
       return;
     }
 
-    for (const step of risk.requiredApprovalChain) {
-      await tx.approvalStep.create({
-        data: {
-          quotationId,
-          level: step.level as ApprovalLevel,
-          sequence: step.sequence,
-          status: ApprovalStepStatus.PENDING,
-          assigneeUserId: await findAssigneeForLevel(tx, step.level as ApprovalLevel),
-        },
-      });
-    }
+    await rebuildApprovalChain(tx, quotationId, risk);
 
     await tx.quotation.update({
       where: { id: quotationId },
