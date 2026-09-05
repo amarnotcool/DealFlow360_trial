@@ -2,6 +2,7 @@ import type {
   QuotationDetailView,
   QuotationListItem,
   QuotationStatus,
+  SalesOrderConfirmationView,
 } from '@dealflow360/shared';
 
 import { apiDelete, apiGet, apiList, apiPatch, apiPost } from '../../lib/api-client';
@@ -45,4 +46,8 @@ export function deleteQuotationLine(quotationId: string, lineId: string, actorUs
 
 export function submitQuotation(quotationId: string, actorUserId: string) {
   return apiPost<QuotationDetailView>(`/quotations/${quotationId}/submit`, { actorUserId });
+}
+
+export function confirmQuotation(quotationId: string, actorUserId: string) {
+  return apiPost<SalesOrderConfirmationView>(`/quotations/${quotationId}/confirm`, { actorUserId });
 }

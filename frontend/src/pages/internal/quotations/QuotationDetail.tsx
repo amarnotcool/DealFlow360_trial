@@ -6,7 +6,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { ApiError, QuotationDetailView, QuotationLineView } from '@dealflow360/shared';
+import type {
+  ApiError,
+  QuotationDetailView,
+  QuotationLineView,
+  SalesOrderConfirmationView,
+} from '@dealflow360/shared';
 
 import { InternalLayout } from '../../../components/layout/InternalLayout';
 import {
@@ -29,6 +34,7 @@ import {
 import { SALES_REP } from '../../../config/current-user';
 import {
   addQuotationLine,
+  confirmQuotation,
   deleteQuotationLine,
   fetchQuotation,
   submitQuotation,
@@ -63,6 +69,7 @@ export default function QuotationDetail() {
   const [routing, setRouting] = useState<RoutingNotice | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [newLineProductId, setNewLineProductId] = useState('');
+  const [confirmation, setConfirmation] = useState<SalesOrderConfirmationView | null>(null);
 
   const load = useCallback(async () => {
     const response = await fetchQuotation(id);
@@ -153,6 +160,22 @@ export default function QuotationDetail() {
     });
   }
 
+  /** Approve → confirm → fulfill: confirming turns the quote into a sales order. */
+  async function handleConfirm() {
+    setBusy(true);
+    const response = await confirmQuotation(id, SALES_REP.id);
+    setBusy(false);
+
+    if (!response.data) {
+      setError(response.error);
+      return;
+    }
+
+    setConfirmation(response.data);
+    setError(null);
+    await load();
+  }
+
   if (error && !quotation) {
     return (
       <InternalLayout breadcrumb={['DealFlow360', 'Quotations']} title="Quotation">
@@ -170,6 +193,7 @@ export default function QuotationDetail() {
   }
 
   const isDraft = quotation.status === 'DRAFT';
+  const isApproved = quotation.status === 'APPROVED';
 
   // The engine's live result wins over the stored columns: a draft that has
   // never been submitted still shows the correct ceiling and overage.
@@ -195,9 +219,15 @@ export default function QuotationDetail() {
           >
             Save Draft
           </Button>
-          <Button onClick={handleSubmit} disabled={!isDraft || busy}>
-            {busy ? 'Working…' : 'Submit for Approval'}
-          </Button>
+          {isApproved ? (
+            <Button onClick={handleConfirm} disabled={busy}>
+              {busy ? 'Working…' : 'Confirm Order'}
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={!isDraft || busy}>
+              {busy ? 'Working…' : 'Submit for Approval'}
+            </Button>
+          )}
         </>
       }
     >
@@ -218,6 +248,26 @@ export default function QuotationDetail() {
           <p className="mt-xs text-body-sm opacity-70">
             The rep never requested approval; the blended score decided the chain.
           </p>
+        </Card>
+      )}
+
+      {confirmation && (
+        <Card tone="lemon" className="mb-lg">
+          <CardLabel>Order confirmed</CardLabel>
+          <p className="mt-xs text-title-md">
+            {`Order confirmed — ${confirmation.number} created`}
+          </p>
+          <p className="mt-xs text-body-sm opacity-70">
+            {confirmation.lines.length} lines · {money(confirmation.totalAmount)}. Stock is allocated on
+            the fulfillment screen.
+          </p>
+          <Button
+            variant="obsidian"
+            className="mt-md"
+            onClick={() => navigate(`/fulfillment/${confirmation.id}`)}
+          >
+            Open fulfillment
+          </Button>
         </Card>
       )}
 

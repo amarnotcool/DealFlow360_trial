@@ -4,6 +4,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import ApprovalDetail from './pages/internal/approvals/ApprovalDetail';
 import ApprovalsList from './pages/internal/approvals/ApprovalsList';
+import FulfillmentDetail from './pages/internal/fulfillment/FulfillmentDetail';
+import FulfillmentList from './pages/internal/fulfillment/FulfillmentList';
 import QuotationDetail from './pages/internal/quotations/QuotationDetail';
 import QuotationsList from './pages/internal/quotations/QuotationsList';
 import Preview from './pages/Preview';
@@ -17,6 +19,8 @@ export default function App() {
       <Route path="/quotations/:id" element={<QuotationDetail />} />
       <Route path="/approvals" element={<ApprovalsList />} />
       <Route path="/approvals/:id" element={<ApprovalDetail />} />
+      <Route path="/fulfillment" element={<FulfillmentList />} />
+      <Route path="/fulfillment/:id" element={<FulfillmentDetail />} />
       <Route path="/preview" element={<Preview />} />
       <Route path="/system" element={<SystemStatus />} />
       <Route path="*" element={<Navigate to="/quotations" replace />} />
