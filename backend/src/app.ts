@@ -11,6 +11,7 @@ import { billingRoutes } from './modules/billing/billing.routes';
 import { customersRoutes } from './modules/customers/customers.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
+import { inventoryRoutes } from './modules/inventory/inventory.routes';
 import { portalRoutes } from './modules/portal/portal.routes';
 import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
@@ -33,6 +34,7 @@ export function createApp() {
   app.use(customersRoutes);
   app.use(rbacRoutes);
   app.use(warehousesRoutes);
+  app.use(inventoryRoutes);
   app.use(quotationsRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);

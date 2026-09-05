@@ -5,6 +5,7 @@ export * from './types/common';
 export * from './types/customer';
 export * from './types/deal-health';
 export * from './types/fulfillment';
+export * from './types/inventory';
 export * from './types/negotiation';
 export * from './types/product';
 export * from './types/quotation';

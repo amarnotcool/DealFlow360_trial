@@ -17,7 +17,14 @@ import {
   SplitSuggestionStatus,
   LineType,
 } from '@prisma/client';
-import type { SplitAllocatorInput, SplitAllocatorResult } from '@dealflow360/shared';
+import type {
+  BackorderStatus as BackorderStatusView,
+  BackorderConsolidationLine,
+  BackorderConsolidationResult,
+  OpenBackorderView,
+  SplitAllocatorInput,
+  SplitAllocatorResult,
+} from '@dealflow360/shared';
 
 import { prisma } from '../../lib/prisma-client';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
@@ -860,4 +867,331 @@ export async function shipFulfillments(salesOrderId: string, actorUserId: string
   });
 
   return getFulfillment(salesOrderId);
+}
+
+// ---------------------------------------------------------------------------
+// Backorders
+//
+// A backorder is what the allocator could not cover when the split was
+// accepted. Until stock could arrive it could only sit there; now that the
+// inventory module can receive stock, an order's open backorders can be run
+// through the allocator again and turned into shipments (specs.md §4,
+// "Consolidate Remaining Backorder").
+// ---------------------------------------------------------------------------
+
+/** The statuses a backorder can still be consolidated from. */
+const OPEN_BACKORDER_STATUSES: BackorderStatus[] = [
+  BackorderStatus.OPEN,
+  BackorderStatus.PARTIALLY_RESOLVED,
+];
+
+const backorderListInclude = {
+  salesOrder: {
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      customer: { select: { id: true, code: true, name: true } },
+    },
+  },
+  salesOrderLine: {
+    select: {
+      id: true,
+      sequence: true,
+      product: { select: { id: true, sku: true, name: true } },
+      productVariant: { select: { id: true, sku: true, name: true } },
+    },
+  },
+  warehouse: { select: { id: true, code: true, name: true } },
+} satisfies Prisma.BackorderInclude;
+
+export interface ListBackordersParams {
+  salesOrderId?: string;
+  /** Resolved and cancelled backorders are hidden unless asked for. */
+  includeResolved: boolean;
+  skip: number;
+  take: number;
+}
+
+export async function listBackorders(
+  params: ListBackordersParams,
+): Promise<{ rows: OpenBackorderView[]; total: number }> {
+  const where: Prisma.BackorderWhereInput = {
+    ...(params.salesOrderId ? { salesOrderId: params.salesOrderId } : {}),
+    ...(params.includeResolved ? {} : { status: { in: OPEN_BACKORDER_STATUSES } }),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.backorder.findMany({
+      where,
+      include: backorderListInclude,
+      orderBy: { createdAt: 'asc' },
+      skip: params.skip,
+      take: params.take,
+    }),
+    prisma.backorder.count({ where }),
+  ]);
+
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      // The shared enum and the Prisma enum hold the same members; the cast is
+      // the boundary, not a widening.
+      status: row.status as BackorderStatusView,
+      quantity: row.quantity.toFixed(2),
+      quantityResolved: row.quantityResolved.toFixed(2),
+      outstanding: row.quantity.minus(row.quantityResolved).toFixed(2),
+      expectedDate: row.expectedDate?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      salesOrder: {
+        id: row.salesOrder.id,
+        number: row.salesOrder.number,
+        status: row.salesOrder.status,
+      },
+      customer: row.salesOrder.customer,
+      salesOrderLine: row.salesOrderLine,
+      warehouse: row.warehouse,
+    })),
+    total,
+  };
+}
+
+/**
+ * Runs the allocator again over everything an order still has on backorder.
+ *
+ * It allocates the outstanding backorder quantities, never the line quantities:
+ * a line whose first shipment is reserved but not yet shipped still reads as
+ * outstanding on the order, and allocating that again would promise the same
+ * units twice.
+ *
+ * What it produces is deliberately identical to an accepted split — a stored
+ * suggestion, reserved stock and RESERVED fulfillment rows — so the existing
+ * ship endpoint carries it the rest of the way with no special case.
+ */
+export async function consolidateBackorders(
+  salesOrderId: string,
+  actorUserId: string,
+  reason: string | null,
+): Promise<BackorderConsolidationResult> {
+  return prisma.$transaction(async (tx) => {
+    const order = await loadOrder(tx, salesOrderId);
+    assertFulfillable(order);
+
+    const backorders = await tx.backorder.findMany({
+      where: { salesOrderId, status: { in: OPEN_BACKORDER_STATUSES } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (backorders.length === 0) {
+      throw new ConflictError(`Sales order ${order.number} has no open backorders`);
+    }
+
+    const lineById = new Map(order.lines.map((line) => [line.id, line]));
+
+    // Several backorders can point at the same line, so the allocator is asked
+    // for the line's total shortfall once rather than line by line.
+    const outstandingByLine = new Map<string, Prisma.Decimal>();
+    for (const backorder of backorders) {
+      const outstanding = backorder.quantity.minus(backorder.quantityResolved);
+      if (outstanding.lessThanOrEqualTo(0)) continue;
+      outstandingByLine.set(
+        backorder.salesOrderLineId,
+        (outstandingByLine.get(backorder.salesOrderLineId) ?? D(0)).plus(outstanding),
+      );
+    }
+
+    const productIds = [...new Set(order.lines.map((line) => line.productId))];
+    const [warehouses, stockRows] = await Promise.all([
+      tx.warehouse.findMany({ where: { isActive: true }, orderBy: { code: 'asc' } }),
+      tx.inventoryStock.findMany({ where: { productId: { in: productIds } } }),
+    ]);
+
+    const input: SplitAllocatorInput = {
+      warehouses: warehouses.map((warehouse) => ({
+        warehouseId: warehouse.id,
+        warehouseCode: warehouse.code,
+        shippingCostWeight: warehouse.shippingCostWeight.toNumber(),
+      })),
+      stock: stockRows.map((row) => ({
+        warehouseId: row.warehouseId,
+        productId: row.productId,
+        productVariantId: row.productVariantId,
+        availableQty: row.available.toNumber(),
+      })),
+      lines: [...outstandingByLine.entries()].map(([lineId, outstanding]) => {
+        const line = lineById.get(lineId);
+        if (!line) throw new NotFoundError('Sales order line', lineId);
+        return {
+          lineId,
+          productId: line.productId,
+          productVariantId: line.productVariantId,
+          requiredQty: outstanding.toNumber(),
+        };
+      }),
+    };
+
+    const result = allocateSplit(input);
+    const allocatedByLine = new Map(result.lines.map((line) => [line.lineId, D(line.allocatedQty)]));
+
+    // Nothing arrived yet: the run is a no-op rather than an empty shipment.
+    if (result.shipments.length === 0) {
+      return {
+        salesOrderId,
+        suggestionId: null,
+        fulfillmentIds: [],
+        totalAllocated: '0.00',
+        totalStillShort: [...outstandingByLine.values()]
+          .reduce((sum, value) => sum.plus(value), D(0))
+          .toFixed(2),
+        backorders: backorders.map((backorder) => ({
+          backorderId: backorder.id,
+          status: backorder.status as BackorderStatusView,
+          outstandingBefore: backorder.quantity.minus(backorder.quantityResolved).toFixed(2),
+          allocated: '0.00',
+          outstandingAfter: backorder.quantity.minus(backorder.quantityResolved).toFixed(2),
+        })),
+      } satisfies BackorderConsolidationResult;
+    }
+
+    const suggestion = await tx.fulfillmentSplitSuggestion.create({
+      data: {
+        salesOrderId,
+        // The plan is applied as it is produced, so it is stored accepted
+        // rather than left as a suggestion someone still has to confirm.
+        status: SplitSuggestionStatus.ACCEPTED,
+        estimatedShipmentCount: result.estimatedShipmentCount,
+        estimatedCost: D(result.estimatedCost),
+        payload: toPayload(result, []),
+        acceptedByUserId: actorUserId,
+        acceptedAt: new Date(),
+      },
+    });
+
+    const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+    const fulfillmentIds: string[] = [];
+
+    for (const shipment of result.shipments) {
+      const warehouse = warehouseById.get(shipment.warehouseId);
+      if (!warehouse) throw new NotFoundError('Warehouse', shipment.warehouseId);
+
+      const entries = shipment.lines.map((entry) => {
+        const line = lineById.get(entry.lineId);
+        if (!line) throw new NotFoundError('Sales order line', entry.lineId);
+        return {
+          salesOrderLineId: line.id,
+          productId: line.productId,
+          productVariantId: line.productVariantId,
+          quantity: D(entry.quantity),
+        };
+      });
+
+      for (const entry of entries) {
+        await reserveStock(
+          tx,
+          shipment.warehouseId,
+          entry.productId,
+          entry.productVariantId,
+          entry.quantity,
+        );
+      }
+
+      const fulfillment = await tx.fulfillment.create({
+        data: {
+          salesOrderId,
+          warehouseId: shipment.warehouseId,
+          splitSuggestionId: suggestion.id,
+          status: FulfillmentStatus.RESERVED,
+          shippingCost: warehouse.shippingCostWeight,
+          lines: JSON.parse(
+            JSON.stringify(
+              entries.map((entry) => ({
+                salesOrderLineId: entry.salesOrderLineId,
+                productId: entry.productId,
+                productVariantId: entry.productVariantId,
+                quantity: entry.quantity.toString(),
+              })),
+            ),
+          ) as Prisma.InputJsonValue,
+        },
+      });
+
+      fulfillmentIds.push(fulfillment.id);
+    }
+
+    // What each line was allocated is shared out over that line's backorders in
+    // the order they were opened, so the oldest shortfall clears first.
+    const remainingByLine = new Map(allocatedByLine);
+    const resolvedAt = new Date();
+    const consolidated: BackorderConsolidationLine[] = [];
+    let totalAllocated = D(0);
+    let totalStillShort = D(0);
+
+    for (const backorder of backorders) {
+      const outstandingBefore = backorder.quantity.minus(backorder.quantityResolved);
+      const pool = remainingByLine.get(backorder.salesOrderLineId) ?? D(0);
+      const take = pool.greaterThan(outstandingBefore) ? outstandingBefore : pool;
+      remainingByLine.set(backorder.salesOrderLineId, pool.minus(take));
+
+      const quantityResolved = backorder.quantityResolved.plus(take);
+      const outstandingAfter = backorder.quantity.minus(quantityResolved);
+      const status = outstandingAfter.lessThanOrEqualTo(0)
+        ? BackorderStatus.RESOLVED
+        : quantityResolved.greaterThan(0)
+          ? BackorderStatus.PARTIALLY_RESOLVED
+          : BackorderStatus.OPEN;
+
+      if (take.greaterThan(0)) {
+        await tx.backorder.update({
+          where: { id: backorder.id },
+          data: {
+            quantityResolved,
+            status,
+            resolvedAt: status === BackorderStatus.RESOLVED ? resolvedAt : null,
+            // Cleared from a single warehouse records where from; a split
+            // leaves it as it was, because no one warehouse covered it.
+            warehouseId:
+              result.shipments.length === 1
+                ? result.shipments[0]!.warehouseId
+                : backorder.warehouseId,
+          },
+        });
+      }
+
+      totalAllocated = totalAllocated.plus(take);
+      totalStillShort = totalStillShort.plus(outstandingAfter);
+      consolidated.push({
+        backorderId: backorder.id,
+        status: status as BackorderStatusView,
+        outstandingBefore: outstandingBefore.toFixed(2),
+        allocated: take.toFixed(2),
+        outstandingAfter: outstandingAfter.toFixed(2),
+      });
+    }
+
+    await recordAudit(tx, {
+      entityType: 'sales_order',
+      entityId: salesOrderId,
+      action: AuditAction.MANUAL_OVERRIDE,
+      userId: actorUserId,
+      reason:
+        reason ??
+        `Consolidated ${consolidated.length} backorder(s) into ${fulfillmentIds.length} shipment(s) after stock arrived`,
+      changes: {
+        suggestionId: suggestion.id,
+        fulfillmentIds,
+        totalAllocated: totalAllocated.toFixed(2),
+        totalStillShort: totalStillShort.toFixed(2),
+        backorders: consolidated.map((line) => ({ id: line.backorderId, status: line.status })),
+      },
+    });
+
+    return {
+      salesOrderId,
+      suggestionId: suggestion.id,
+      fulfillmentIds,
+      totalAllocated: totalAllocated.toFixed(2),
+      totalStillShort: totalStillShort.toFixed(2),
+      backorders: consolidated,
+    } satisfies BackorderConsolidationResult;
+  });
 }

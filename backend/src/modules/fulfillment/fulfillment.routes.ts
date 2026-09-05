@@ -5,7 +5,14 @@ import { auth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
 import * as controller from './fulfillment.controller';
-import { acceptSchema, idParamSchema, listQuerySchema, overrideSchema } from './fulfillment.schemas';
+import {
+  acceptSchema,
+  backorderListQuerySchema,
+  consolidateSchema,
+  idParamSchema,
+  listQuerySchema,
+  overrideSchema,
+} from './fulfillment.schemas';
 
 export const fulfillmentRoutes = Router();
 
@@ -14,6 +21,7 @@ export const fulfillmentRoutes = Router();
 const movesStock = requireRole('FINANCE', 'ADMIN');
 
 fulfillmentRoutes.use('/fulfillment', auth);
+fulfillmentRoutes.use('/backorders', auth);
 
 // `:id` is a sales_order id — fulfillment anchors on the order, not the quote.
 fulfillmentRoutes.get('/fulfillment', validate('query', listQuerySchema), asyncHandler(controller.list));
@@ -53,4 +61,21 @@ fulfillmentRoutes.post(
   movesStock,
   validate('params', idParamSchema),
   asyncHandler(controller.ship),
+);
+
+// What is still short across every order — the queue stock receipts feed.
+fulfillmentRoutes.get(
+  '/backorders',
+  validate('query', backorderListQuerySchema),
+  asyncHandler(controller.backorders),
+);
+
+// specs.md §4: once stock arrives, the remaining backorder is consolidated
+// into new shipments. Reserving is all this does; /ship still sends them.
+fulfillmentRoutes.post(
+  '/fulfillment/:id/consolidate-backorders',
+  movesStock,
+  validate('params', idParamSchema),
+  validate('body', consolidateSchema),
+  asyncHandler(controller.consolidate),
 );
