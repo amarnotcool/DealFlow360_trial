@@ -21,7 +21,7 @@ import type {
   SubscriptionListMeta,
 } from '@dealflow360/shared';
 
-import { InternalLayout } from '../../../components/layout/InternalLayout';
+import { InternalLayout } from '../../components/layout/InternalLayout';
 import {
   Badge,
   Card,
@@ -35,19 +35,19 @@ import {
   Td,
   Th,
   Tr,
-} from '../../../components/ui';
-import { useAuth } from '../../../features/auth/useAuth';
-import { fetchApprovals } from '../../../features/approvals/approvals.api';
-import { fetchCustomers } from '../../../features/customers/customers.api';
-import { fetchAlerts } from '../../../features/deal-health/deal-health.api';
-import { fetchBackorders } from '../../../features/fulfillment/fulfillment.api';
-import { fetchInvoices } from '../../../features/invoices/invoices.api';
-import { fetchProducts } from '../../../features/products/products.api';
-import { EMPTY_FILTERS, fetchSummary } from '../../../features/reporting/reporting.api';
-import { fetchQuotations } from '../../../features/quotations/quotations.api';
-import { fetchSubscriptions } from '../../../features/subscriptions/subscriptions.api';
-import { fetchUsers } from '../../../features/users/users.api';
-import { date, humanise, money } from '../../../lib/format';
+} from '../../components/ui';
+import { useAuth } from '../../features/auth/useAuth';
+import { fetchApprovals } from '../../features/approvals/approvals.api';
+import { fetchCustomers } from '../../features/customers/customers.api';
+import { fetchAlerts } from '../../features/deal-health/deal-health.api';
+import { fetchBackorders } from '../../features/fulfillment/fulfillment.api';
+import { fetchInvoices } from '../../features/invoices/invoices.api';
+import { fetchProducts } from '../../features/products/products.api';
+import { EMPTY_FILTERS, fetchSummary } from '../../features/reporting/reporting.api';
+import { fetchQuotations } from '../../features/quotations/quotations.api';
+import { fetchSubscriptions } from '../../features/subscriptions/subscriptions.api';
+import { fetchUsers } from '../../features/users/users.api';
+import { date, humanise, money } from '../../lib/format';
 
 /** Stages that still need someone to do something. Plain strings compared with
  *  String(...): shared enums cannot cross into the Vite bundle as values. */
