@@ -2,15 +2,24 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ApiError, QuotationListItem, QuotationStatus } from '@dealflow360/shared';
+import type {
+  ApiError,
+  CustomerListItem,
+  QuotationListItem,
+  QuotationStatus,
+} from '@dealflow360/shared';
 
 import { InternalLayout } from '../../../components/layout/InternalLayout';
 import {
   Badge,
   Button,
+  Card,
+  CardLabel,
   EmptyCard,
   ErrorCard,
+  FIELD_CLASS,
   FilterPill,
+  LabelledField,
   LoadingCard,
   RiskBadge,
   SearchInput,
@@ -21,15 +30,9 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
+import { fetchCustomers } from '../../../features/customers/customers.api';
 import { createQuotation, fetchQuotations } from '../../../features/quotations/quotations.api';
-import { humanise, money } from '../../../lib/format';
-
-/**
- * The customer a new draft opens against. A customer picker is a later module;
- * until it exists this is the seeded account, and it is the only placeholder
- * left on this screen — the owner and the actor both come from the session.
- */
-const DEFAULT_CUSTOMER_ID = '88888888-8888-4888-8888-000000000002';
+import { humanise, money, percent } from '../../../lib/format';
 
 /** The stages specs.md §6 groups the list by. */
 const STAGES: Array<{ label: string; value: QuotationStatus | 'ALL' }> = [
@@ -50,6 +53,12 @@ export default function QuotationsList() {
   const [error, setError] = useState<ApiError | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // A new draft has to be raised against a customer, so the button opens the
+  // picker rather than assuming one.
+  const [picking, setPicking] = useState(false);
+  const [customers, setCustomers] = useState<CustomerListItem[] | null>(null);
+  const [customerId, setCustomerId] = useState('');
+
   const load = useCallback(async (selected: QuotationStatus | 'ALL') => {
     setRows(null);
     setError(null);
@@ -63,9 +72,23 @@ export default function QuotationsList() {
     void load(stage);
   }, [load, stage]);
 
+  function openPicker() {
+    setPicking((open) => !open);
+    setError(null);
+
+    if (customers === null) {
+      void fetchCustomers().then((response) => {
+        setCustomers(response.data ?? []);
+        setError(response.error);
+      });
+    }
+  }
+
   async function handleNewQuotation() {
+    if (!customerId) return;
+
     setCreating(true);
-    const response = await createQuotation({ customerId: DEFAULT_CUSTOMER_ID, lines: [] });
+    const response = await createQuotation({ customerId, lines: [] });
     setCreating(false);
 
     if (response.data) {
@@ -90,14 +113,54 @@ export default function QuotationsList() {
       breadcrumb={['DealFlow360']}
       title="Quotations"
       actions={
-        <Button onClick={handleNewQuotation} disabled={creating}>
-          {creating ? 'Creating…' : 'New Quotation'}
-        </Button>
+        <Button onClick={openPicker}>{picking ? 'Close' : 'New Quotation'}</Button>
       }
     >
       {error && <ErrorCard error={error} />}
 
-      <TableShell className={error ? 'mt-lg' : undefined}>
+      {picking && (
+        <Card className={error ? 'mt-lg' : undefined}>
+          <CardLabel>New quotation</CardLabel>
+          <p className="mt-xs text-body-sm text-ink-subtle">
+            Choose the customer this draft is raised against — their tier sets the discount ceiling
+            every line is scored against.
+          </p>
+
+          {customers === null ? (
+            <p className="mt-md text-body-sm text-ink-subtle">Loading customers…</p>
+          ) : customers.length === 0 ? (
+            <p className="mt-md text-body-sm text-ink-subtle">
+              No active customers yet — add one on the Customers screen first.
+            </p>
+          ) : (
+            <div className="mt-md flex flex-wrap items-end gap-md">
+              <div className="w-[22rem] max-w-full">
+                <LabelledField label="Customer">
+                  <select
+                    aria-label="Customer"
+                    className={FIELD_CLASS}
+                    value={customerId}
+                    onChange={(event) => setCustomerId(event.target.value)}
+                  >
+                    <option value="">Choose a customer</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name} — {customer.customerTier.name}, ceiling{' '}
+                        {percent(customer.customerTier.ceilingPct)}
+                      </option>
+                    ))}
+                  </select>
+                </LabelledField>
+              </div>
+              <Button onClick={handleNewQuotation} disabled={creating || !customerId}>
+                {creating ? 'Creating…' : 'Create draft'}
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <TableShell className={error || picking ? 'mt-lg' : undefined}>
         <TableToolbar>
           <div className="flex flex-wrap items-center gap-xs">
             {STAGES.map((option) => (

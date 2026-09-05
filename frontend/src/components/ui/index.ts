@@ -5,6 +5,7 @@ export { Button, IconButton } from './Button';
 export { Badge, RiskBadge, RISK_BADGE_VARIANT } from './Badge';
 export { SearchInput } from './SearchInput';
 export { FilterPill } from './FilterPill';
+export { FIELD_CLASS, LabelledField } from './Field';
 export {
   Table,
   TableShell,

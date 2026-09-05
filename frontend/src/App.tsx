@@ -8,6 +8,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import ApprovalDetail from './pages/internal/approvals/ApprovalDetail';
 import ApprovalsList from './pages/internal/approvals/ApprovalsList';
+import CustomerDetail from './pages/internal/customers/CustomerDetail';
+import CustomersList from './pages/internal/customers/CustomersList';
 import Login from './pages/auth/Login';
 import FulfillmentDetail from './pages/internal/fulfillment/FulfillmentDetail';
 import FulfillmentList from './pages/internal/fulfillment/FulfillmentList';
@@ -19,11 +21,13 @@ import QuotationDetail from './pages/internal/quotations/QuotationDetail';
 import QuotationsList from './pages/internal/quotations/QuotationsList';
 import SubscriptionDetail from './pages/internal/subscriptions/SubscriptionDetail';
 import SubscriptionsList from './pages/internal/subscriptions/SubscriptionsList';
+import UserDetail from './pages/internal/users/UserDetail';
+import UsersList from './pages/internal/users/UsersList';
 import Preview from './pages/Preview';
 import SystemStatus from './pages/SystemStatus';
 import PortalRoutes from './routes/portal-routes';
 import { RequireAuth, RequireRole } from './routes/guards';
-import { APPROVALS_ROLES, BILLING_ROLES } from './routes/access';
+import { ADMIN_ONLY, APPROVALS_ROLES, BILLING_ROLES } from './routes/access';
 
 export default function App() {
   return (
@@ -136,6 +140,43 @@ export default function App() {
           <RequireAuth>
             <ProductDetail />
           </RequireAuth>
+        }
+      />
+
+      {/* The customer book is readable by everyone; reps and admins maintain it
+          (specs.md §2), and the API enforces that on the write endpoints. */}
+      <Route
+        path="/customers"
+        element={
+          <RequireAuth>
+            <CustomersList />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/customers/:id"
+        element={
+          <RequireAuth>
+            <CustomerDetail />
+          </RequireAuth>
+        }
+      />
+
+      {/* Who can sign in, and as what, is admin-only in full. */}
+      <Route
+        path="/users"
+        element={
+          <RequireRole allow={ADMIN_ONLY}>
+            <UsersList />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/users/:id"
+        element={
+          <RequireRole allow={ADMIN_ONLY}>
+            <UserDetail />
+          </RequireRole>
         }
       />
 
