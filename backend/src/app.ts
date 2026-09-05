@@ -18,6 +18,7 @@ import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
 import { rbacRoutes } from './modules/rbac/rbac.routes';
+import { reportingRoutes } from './modules/reporting/reporting.routes';
 import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes';
 import { warehousesRoutes } from './modules/warehouses/warehouses.routes';
 
@@ -42,6 +43,7 @@ export function createApp() {
   app.use(dealHealthRoutes);
   app.use(subscriptionsRoutes);
   app.use(billingRoutes);
+  app.use(reportingRoutes);
 
   // The customer portal is a separate surface with its own session (rule 4).
   app.use(portalAuthRoutes);
