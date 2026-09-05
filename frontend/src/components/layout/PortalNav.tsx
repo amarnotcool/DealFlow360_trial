@@ -17,7 +17,10 @@ export function PortalNav() {
   const navigate = useNavigate();
 
   return (
-    <header className="frost-rail mb-lg flex flex-wrap items-center justify-between gap-md rounded-vessel px-lg py-md">
+    {/* Sticky for the same reason as the internal action bar: the pill is
+        already frosted, so it only needed the stick point. top-lg matches the
+        page's own top padding — zero jump when it locks. */}
+    <header className="frost-rail sticky top-lg z-10 mb-lg flex flex-wrap items-center justify-between gap-md rounded-vessel px-lg py-md">
       <div className="flex items-center gap-md">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-obsidian text-label-xs text-lemon">
           DF

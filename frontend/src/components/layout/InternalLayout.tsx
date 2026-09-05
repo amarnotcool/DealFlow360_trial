@@ -19,7 +19,12 @@ export function InternalLayout({ breadcrumb = [], title, actions, children }: In
       <InternalNav />
 
       <div className="min-w-0 flex-1">
-        <header className="mb-lg flex flex-wrap items-center justify-between gap-md">
+        {/* Sticky action bar: sticks at the same offset as the rail (top-lg),
+            which is also the page's own top padding — so it locks with zero
+            jump. Sticky, not fixed, so it keeps its flow space and content
+            never slides underneath it. The frost keeps scrolled rows from
+            ghosting through. */}
+        <header className="frost sticky top-lg z-10 mb-lg flex flex-wrap items-center justify-between gap-md rounded-vessel px-lg py-md">
           <div className="min-w-0">
             {breadcrumb.length > 0 && (
               <p className="mb-2xs flex items-center gap-2xs text-label-md text-ink-subtle">
