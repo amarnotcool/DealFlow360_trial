@@ -15,7 +15,9 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <BrowserRouter>
+    {/* Opt in to the React Router v7 behaviours now, so the console stays clean
+        and the upgrade is a no-op. */}
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <PortalAuthProvider>
           <App />
