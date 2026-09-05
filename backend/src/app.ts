@@ -9,6 +9,7 @@ import { approvalsRoutes } from './modules/approvals/approvals.routes';
 import { authRoutes } from './modules/auth/auth.routes';
 import { billingRoutes } from './modules/billing/billing.routes';
 import { customersRoutes } from './modules/customers/customers.routes';
+import { dealHealthRoutes } from './modules/deal-health/deal-health.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
 import { inventoryRoutes } from './modules/inventory/inventory.routes';
@@ -38,6 +39,7 @@ export function createApp() {
   app.use(quotationsRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);
+  app.use(dealHealthRoutes);
   app.use(subscriptionsRoutes);
   app.use(billingRoutes);
 

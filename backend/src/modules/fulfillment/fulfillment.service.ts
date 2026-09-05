@@ -34,6 +34,17 @@ import { allocateSplit } from './split-allocator';
 
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value);
 
+/**
+ * How long after a shipment is reserved we promise it to the customer. The
+ * deal-health module's DELIVERY_SLIPPAGE detector compares against this: with
+ * no promised date there is nothing for a promise to slip against.
+ */
+const PROMISE_LEAD_DAYS = 7;
+
+function promisedDateFrom(reservedAt: Date): Date {
+  return new Date(reservedAt.getTime() + PROMISE_LEAD_DAYS * 24 * 60 * 60 * 1000);
+}
+
 /** The statuses an order can still be fulfilled from. */
 const OPEN_ORDER_STATUSES: SalesOrderStatus[] = [
   SalesOrderStatus.CONFIRMED,
@@ -435,6 +446,7 @@ async function materialise(
         status: FulfillmentStatus.RESERVED,
         isManualOverride,
         shippingCost: warehouse.shippingCostWeight,
+        promisedDate: promisedDateFrom(new Date()),
         lines: JSON.parse(
           JSON.stringify(
             plan.lines.map((line) => ({
@@ -1102,6 +1114,7 @@ export async function consolidateBackorders(
           splitSuggestionId: suggestion.id,
           status: FulfillmentStatus.RESERVED,
           shippingCost: warehouse.shippingCostWeight,
+          promisedDate: promisedDateFrom(new Date()),
           lines: JSON.parse(
             JSON.stringify(
               entries.map((entry) => ({

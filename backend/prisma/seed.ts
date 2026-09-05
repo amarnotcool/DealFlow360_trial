@@ -9,7 +9,16 @@
 // them is the discount engine's job, not the seed's.
 
 import 'dotenv/config';
-import { PrismaClient, Prisma, BillingCycle, LineType, QuotationStatus, ApprovalLevel } from '@prisma/client';
+import {
+  PrismaClient,
+  Prisma,
+  BillingCycle,
+  FulfillmentStatus,
+  LineType,
+  QuotationStatus,
+  SalesOrderStatus,
+  ApprovalLevel,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -75,7 +84,47 @@ const ID = {
   lineLaptop: 'cccccccc-cccc-4ccc-8ccc-000000000101',
   lineSetup: 'cccccccc-cccc-4ccc-8ccc-000000000102',
   lineWarranty: 'cccccccc-cccc-4ccc-8ccc-000000000103',
+
+  // --- Deal health fixtures (see DEAL_HEALTH_FIXTURES below) --------------
+  customerGlobex: '88888888-8888-4888-8888-000000000004',
+  contactGlobex: '88888888-8888-4888-8888-000000000005',
+  customerInitech: '88888888-8888-4888-8888-000000000006',
+  contactInitech: '88888888-8888-4888-8888-000000000007',
+
+  quotationStalled: 'eeeeeeee-eeee-4eee-8eee-000000000001',
+  quotationNormalA: 'eeeeeeee-eeee-4eee-8eee-000000000002',
+  quotationNormalB: 'eeeeeeee-eeee-4eee-8eee-000000000003',
+  quotationNormalC: 'eeeeeeee-eeee-4eee-8eee-000000000004',
+  quotationAnomaly: 'eeeeeeee-eeee-4eee-8eee-000000000005',
+  quotationLate: 'eeeeeeee-eeee-4eee-8eee-000000000006',
+
+  salesOrderLate: 'eeeeeeee-eeee-4eee-8eee-000000000011',
+  salesOrderLineLate: 'eeeeeeee-eeee-4eee-8eee-000000000012',
+  fulfillmentLate: 'eeeeeeee-eeee-4eee-8eee-000000000013',
 } as const;
+
+/**
+ * What each deal-health fixture is for. POST /alerts/scan on a fresh seed opens
+ * exactly three alerts, one per type in specs.md §4:
+ *
+ *   STALLED_DEAL      Q-2026-0003 (Globex) — last activity backdated 30 days,
+ *                     still DRAFT, so it clears the 14-day threshold.
+ *   DISCOUNT_ANOMALY  Q-2026-0007 (Initech) — 40% against the same rep's own
+ *                     average of roughly 5%, built from Q-2026-0004/5/6 at 8%
+ *                     plus the quotes already in the seed.
+ *   DELIVERY_SLIPPAGE SO-2026-0001 (Acme) — one reserved shipment whose
+ *                     promised date is 10 days in the past and has not shipped.
+ */
+const DEAL_HEALTH_FIXTURES = {
+  /** How far back the stalled quote's last activity is set. */
+  stalledIdleDays: 30,
+  /** How far in the past the late shipment's promise sits. */
+  promiseLateDays: 10,
+} as const;
+
+function daysAgo(days: number): Date {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
 
 /** Per-line money, derived from the list price, quantity and discount above. */
 function lineMoney(listPrice: string, unitCost: string, quantity: string, discountPct: string) {
@@ -120,6 +169,26 @@ const hybridMarginPct = hybridSubtotal.isZero()
   ? D(0)
   : hybridMargin.div(hybridSubtotal).mul(100).toDecimalPlaces(2);
 
+// --- Deal health fixture money -------------------------------------------
+// Single-line quotes, so the weighted discount of each is simply its line's.
+const stalledLine = lineMoney('120000', '90000', '2', '5');
+const normalLine = lineMoney('120000', '90000', '1', '8');
+const anomalyLine = lineMoney('120000', '90000', '3', '40');
+const lateLine = lineMoney('15000', '5000', '1', '0');
+
+/** One-line quotation totals, derived the same way the worked example's are. */
+function singleLineTotals(line: ReturnType<typeof lineMoney>) {
+  return {
+    subtotalAmount: line.lineSubtotal,
+    discountAmount: line.lineSubtotal.minus(line.lineTotal).toDecimalPlaces(2),
+    oneTimeTotalAmount: line.lineTotal,
+    recurringTotalAmount: D('0.00'),
+    totalAmount: line.lineTotal,
+    marginAmount: line.marginAmount,
+    marginPct: line.marginPct,
+  };
+}
+
 // Dev-only credential: every seeded internal login and the portal contact share
 // the password `dealflow360`. It is hashed here the same way a real one would
 // be, so POST /auth/login runs the identical bcrypt comparison.
@@ -131,6 +200,7 @@ async function main() {
     // Wipe in FK-safe order (children first). Order and fulfillment rows are
     // written by the running app (POST /quotations/:id/confirm and the
     // fulfillment module), so a reseed has to clear them too.
+    await tx.alert.deleteMany();
     await tx.auditLog.deleteMany();
     await tx.payment.deleteMany();
     await tx.creditNote.deleteMany();
@@ -316,6 +386,56 @@ async function main() {
       },
     });
 
+    // Two more customers, so the book, the pickers and the deal-health board
+    // have more than one name in them.
+    await tx.customer.createMany({
+      data: [
+        {
+          id: ID.customerGlobex,
+          code: 'GLOBEX',
+          name: 'Globex Industries',
+          customerTierId: ID.tierSilver,
+          accountOwnerUserId: ID.userSalesRep,
+          email: 'ap@globex.test',
+          billingAddress: 'Andheri East, Mumbai 400069',
+        },
+        {
+          id: ID.customerInitech,
+          code: 'INITECH',
+          name: 'Initech',
+          customerTierId: ID.tierBronze,
+          accountOwnerUserId: ID.userSalesRep,
+          email: 'ap@initech.test',
+          billingAddress: 'Hinjewadi Phase 2, Pune 411057',
+        },
+      ],
+    });
+
+    await tx.customerContact.createMany({
+      data: [
+        {
+          id: ID.contactGlobex,
+          customerId: ID.customerGlobex,
+          fullName: 'Gita Rao',
+          email: 'gita@globex.test',
+          isPrimary: true,
+          portalRoleId: ID.portalRoleBuyer,
+          portalPasswordHash: PLACEHOLDER_PASSWORD_HASH,
+          portalTokenVersion: 0,
+        },
+        {
+          id: ID.contactInitech,
+          customerId: ID.customerInitech,
+          fullName: 'Ishan Mehta',
+          email: 'ishan@initech.test',
+          isPrimary: true,
+          portalRoleId: ID.portalRoleBuyer,
+          portalPasswordHash: PLACEHOLDER_PASSWORD_HASH,
+          portalTokenVersion: 0,
+        },
+      ],
+    });
+
     // --- Warehouses & stock -------------------------------------------------
     await tx.warehouse.createMany({
       data: [
@@ -332,7 +452,9 @@ async function main() {
       data: [
         { id: ID.stockLaptopMumbai, warehouseId: ID.whMumbai, productId: ID.prodLaptop, productVariantId: ID.variantLaptop, onHand: D('6.00'), reserved: D('0.00'), available: D('6.00') },
         { id: ID.stockLaptopDelhi, warehouseId: ID.whDelhi, productId: ID.prodLaptop, productVariantId: ID.variantLaptop, onHand: D('5.00'), reserved: D('0.00'), available: D('5.00') },
-        { id: ID.stockWarrantyMumbai, warehouseId: ID.whMumbai, productId: ID.prodWarranty, onHand: D('3.00'), reserved: D('0.00'), available: D('3.00') },
+        // One warranty unit is reserved for the late shipment fixture below,
+        // so the stock row and that shipment agree.
+        { id: ID.stockWarrantyMumbai, warehouseId: ID.whMumbai, productId: ID.prodWarranty, onHand: D('3.00'), reserved: D('1.00'), available: D('2.00') },
         { id: ID.stockWarrantyDelhi, warehouseId: ID.whDelhi, productId: ID.prodWarranty, onHand: D('0.00'), reserved: D('0.00'), available: D('0.00') },
       ],
     });
@@ -444,6 +566,181 @@ async function main() {
         },
       ],
     });
+
+    // --- Deal health fixtures ----------------------------------------------
+    // Three quotations and one order, shaped so that a scan on a fresh seed
+    // opens exactly one alert of each type. See DEAL_HEALTH_FIXTURES above.
+
+    // STALLED_DEAL: idle far past the 14-day threshold, still a live draft.
+    await tx.quotation.create({
+      data: {
+        id: ID.quotationStalled,
+        number: 'Q-2026-0003',
+        customerId: ID.customerGlobex,
+        customerContactId: ID.contactGlobex,
+        ownerUserId: ID.userSalesRep,
+        status: QuotationStatus.DRAFT,
+        ...singleLineTotals(stalledLine),
+        notes: 'Waiting on Globex to come back with headcount.',
+        lastActivityAt: daysAgo(DEAL_HEALTH_FIXTURES.stalledIdleDays),
+        createdAt: daysAgo(DEAL_HEALTH_FIXTURES.stalledIdleDays),
+      },
+    });
+
+    await tx.quotationLine.create({
+      data: {
+        quotationId: ID.quotationStalled,
+        productId: ID.prodLaptop,
+        productVariantId: ID.variantLaptop,
+        categoryId: ID.catHardware,
+        lineType: LineType.ONE_TIME,
+        sequence: 1,
+        description: 'Laptop Pro 14 — 16GB/512GB',
+        ...stalledLine,
+      },
+    });
+
+    // DISCOUNT_ANOMALY: three ordinary quotes give the rep an average to be
+    // measured against, and the fourth is the outlier the detector must find.
+    const anomalyHistory = [
+      { id: ID.quotationNormalA, number: 'Q-2026-0004' },
+      { id: ID.quotationNormalB, number: 'Q-2026-0005' },
+      { id: ID.quotationNormalC, number: 'Q-2026-0006' },
+    ];
+
+    for (const [index, quote] of anomalyHistory.entries()) {
+      await tx.quotation.create({
+        data: {
+          id: quote.id,
+          number: quote.number,
+          customerId: ID.customerInitech,
+          customerContactId: ID.contactInitech,
+          ownerUserId: ID.userSalesRep,
+          status: QuotationStatus.DRAFT,
+          ...singleLineTotals(normalLine),
+          notes: 'Routine replacement order.',
+        },
+      });
+
+      await tx.quotationLine.create({
+        data: {
+          quotationId: quote.id,
+          productId: ID.prodLaptop,
+          productVariantId: ID.variantLaptop,
+          categoryId: ID.catHardware,
+          lineType: LineType.ONE_TIME,
+          sequence: index + 1,
+          description: 'Laptop Pro 14 — 16GB/512GB',
+          ...normalLine,
+        },
+      });
+    }
+
+    await tx.quotation.create({
+      data: {
+        id: ID.quotationAnomaly,
+        number: 'Q-2026-0007',
+        customerId: ID.customerInitech,
+        customerContactId: ID.contactInitech,
+        ownerUserId: ID.userSalesRep,
+        status: QuotationStatus.DRAFT,
+        ...singleLineTotals(anomalyLine),
+        notes: 'Aggressive pricing to win the refresh.',
+      },
+    });
+
+    await tx.quotationLine.create({
+      data: {
+        quotationId: ID.quotationAnomaly,
+        productId: ID.prodLaptop,
+        productVariantId: ID.variantLaptop,
+        categoryId: ID.catHardware,
+        lineType: LineType.ONE_TIME,
+        sequence: 1,
+        description: 'Laptop Pro 14 — 16GB/512GB',
+        ...anomalyLine,
+      },
+    });
+
+    // DELIVERY_SLIPPAGE: a confirmed order whose reserved shipment was promised
+    // ten days ago and has not left the warehouse.
+    await tx.quotation.create({
+      data: {
+        id: ID.quotationLate,
+        number: 'Q-2026-0008',
+        customerId: ID.customerAcme,
+        customerContactId: ID.contactAcme,
+        ownerUserId: ID.userSalesRep,
+        status: QuotationStatus.CONFIRMED,
+        ...singleLineTotals(lateLine),
+        notes: 'Warranty top-up, confirmed and awaiting dispatch.',
+        submittedAt: daysAgo(20),
+        approvedAt: daysAgo(19),
+        confirmedAt: daysAgo(18),
+      },
+    });
+
+    await tx.quotationLine.create({
+      data: {
+        quotationId: ID.quotationLate,
+        productId: ID.prodWarranty,
+        categoryId: ID.catHardware,
+        lineType: LineType.ONE_TIME,
+        sequence: 1,
+        description: 'Extended Warranty',
+        ...lateLine,
+      },
+    });
+
+    await tx.salesOrder.create({
+      data: {
+        id: ID.salesOrderLate,
+        number: 'SO-2026-0001',
+        quotationId: ID.quotationLate,
+        customerId: ID.customerAcme,
+        status: SalesOrderStatus.CONFIRMED,
+        orderDate: daysAgo(18),
+        oneTimeTotalAmount: lateLine.lineTotal,
+        recurringTotalAmount: D('0.00'),
+        totalAmount: lateLine.lineTotal,
+        confirmedByUserId: ID.userSalesRep,
+      },
+    });
+
+    await tx.salesOrderLine.create({
+      data: {
+        id: ID.salesOrderLineLate,
+        salesOrderId: ID.salesOrderLate,
+        productId: ID.prodWarranty,
+        lineType: LineType.ONE_TIME,
+        sequence: 1,
+        quantity: lateLine.quantity,
+        quantityFulfilled: D('0.00'),
+        unitPrice: lateLine.unitPrice,
+        discountPct: lateLine.discountPct,
+        lineTotal: lateLine.lineTotal,
+      },
+    });
+
+    await tx.fulfillment.create({
+      data: {
+        id: ID.fulfillmentLate,
+        salesOrderId: ID.salesOrderLate,
+        warehouseId: ID.whMumbai,
+        status: FulfillmentStatus.RESERVED,
+        shippingCost: D('1.00'),
+        // The same shape the fulfillment module writes, so /ship can carry it.
+        lines: [
+          {
+            salesOrderLineId: ID.salesOrderLineLate,
+            productId: ID.prodWarranty,
+            productVariantId: null,
+            quantity: '1',
+          },
+        ],
+        promisedDate: daysAgo(DEAL_HEALTH_FIXTURES.promiseLateDays),
+      },
+    });
   });
 
   const counts = {
@@ -464,6 +761,8 @@ async function main() {
     inventoryStock: await prisma.inventoryStock.count(),
     quotation: await prisma.quotation.count(),
     quotationLine: await prisma.quotationLine.count(),
+    salesOrder: await prisma.salesOrder.count(),
+    fulfillment: await prisma.fulfillment.count(),
   };
 
   console.log('Seed complete. Row counts:');
