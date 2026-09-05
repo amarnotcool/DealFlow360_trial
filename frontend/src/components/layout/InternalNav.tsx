@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Invoices', to: '/invoices', enabled: true, roles: BILLING_ROLES, icon: <Glyph d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" /> },
   { label: 'Deal Health', to: '/deal-health', enabled: false, roles: APPROVALS_ROLES, icon: <Glyph d="M3 12h4l2 6 4-14 2 8h6" /> },
   { label: 'Reports', to: '/reports', enabled: false, roles: APPROVALS_ROLES, icon: <Glyph d="M4 20V9M10 20V4M16 20v-7M22 20H2" /> },
-  { label: 'Products', to: '/products', enabled: false, roles: ['ADMIN'], icon: <Glyph d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /> },
+  { label: 'Products', to: '/products', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /> },
 ];
 
 const PILL_BASE =

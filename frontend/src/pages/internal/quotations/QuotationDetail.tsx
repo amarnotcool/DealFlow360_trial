@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type {
   ApiError,
+  ProductListItem,
   QuotationDetailView,
   QuotationLineView,
   SalesOrderConfirmationView,
@@ -31,6 +32,7 @@ import {
   Th,
   Tr,
 } from '../../../components/ui';
+import { fetchProducts } from '../../../features/products/products.api';
 import {
   addQuotationLine,
   confirmQuotation,
@@ -50,6 +52,10 @@ interface RoutingNotice {
 /** Live per-line engine result, keyed by line id. */
 type LineRisk = { applicableCeilingPct: number; overagePct: number };
 
+const PICKER_CLASS =
+  'frost-input h-10 max-w-full rounded-full px-md text-body-sm text-ink-body ' +
+  'focus:outline-none focus:ring-2 focus:ring-lemon/60 disabled:opacity-50';
+
 function LineStatus({ overagePct }: { overagePct: number }) {
   if (overagePct > 0) {
     return <Badge variant="critical">OVER (+{points(overagePct)}pt)</Badge>;
@@ -67,7 +73,10 @@ export default function QuotationDetail() {
   const [busy, setBusy] = useState(false);
   const [routing, setRouting] = useState<RoutingNotice | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductListItem[]>([]);
   const [newLineProductId, setNewLineProductId] = useState('');
+  const [newLineVariantId, setNewLineVariantId] = useState('');
+  const [newLineQuantity, setNewLineQuantity] = useState('1');
   const [confirmation, setConfirmation] = useState<SalesOrderConfirmationView | null>(null);
 
   const load = useCallback(async () => {
@@ -79,6 +88,12 @@ export default function QuotationDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // The picker only offers products that can still be sold; a deactivated one
+  // stays on the quotes that already carry it but cannot be added to a new line.
+  useEffect(() => {
+    void fetchProducts().then((response) => setProducts(response.data ?? []));
+  }, []);
 
   /** Live discount check: commit on blur, then re-render from the server. */
   async function commitDiscount(line: QuotationLineView, raw: string) {
@@ -101,18 +116,19 @@ export default function QuotationDetail() {
     setError(response.error);
   }
 
-  /** Minimal add-line control: a product id, quantity 1, no discount. The
-      product picker arrives with the products module. */
+  /** Adds the chosen product — and its variant, when it has one — at no
+      discount; the engine re-scores the quote and the server sends it back. */
   async function handleAddLine() {
-    const productId = newLineProductId.trim();
-    if (!productId) {
+    const quantity = Number(newLineQuantity);
+    if (!newLineProductId || !Number.isFinite(quantity) || quantity <= 0) {
       return;
     }
 
     setBusy(true);
     const response = await addQuotationLine(id, {
-      productId,
-      quantity: 1,
+      productId: newLineProductId,
+      productVariantId: newLineVariantId || null,
+      quantity,
       discountPct: 0,
     });
     setBusy(false);
@@ -120,6 +136,8 @@ export default function QuotationDetail() {
     if (response.data) {
       setQuotation(response.data);
       setNewLineProductId('');
+      setNewLineVariantId('');
+      setNewLineQuantity('1');
       return;
     }
     setError(response.error);
@@ -190,6 +208,7 @@ export default function QuotationDetail() {
   }
 
   const isDraft = quotation.status === 'DRAFT';
+  const selectedProduct = products.find((product) => product.id === newLineProductId) ?? null;
   const isApproved = quotation.status === 'APPROVED';
 
   // The engine's live result wins over the stored columns: a draft that has
@@ -311,20 +330,56 @@ export default function QuotationDetail() {
             <Badge variant="neutral">{quotation.lines.length} lines</Badge>
             {recalculatingLineId && <Badge variant="primary">Recalculating…</Badge>}
           </div>
-          <div className="flex items-center gap-sm">
-            <input
+          <div className="flex flex-wrap items-center gap-sm">
+            <select
               value={newLineProductId}
-              onChange={(event) => setNewLineProductId(event.target.value)}
-              placeholder="Product id"
-              aria-label="Product id to add"
+              onChange={(event) => {
+                setNewLineProductId(event.target.value);
+                setNewLineVariantId('');
+              }}
+              aria-label="Product to add"
               disabled={!isDraft}
-              className="frost-input h-10 w-[20rem] max-w-full rounded-full px-md text-body-sm
-                placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-lemon/60"
+              className={PICKER_CLASS}
+            >
+              <option value="">Choose a product…</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} · {product.sku} · {money(product.listPrice)}
+                </option>
+              ))}
+            </select>
+
+            {selectedProduct && selectedProduct.variants.length > 0 && (
+              <select
+                value={newLineVariantId}
+                onChange={(event) => setNewLineVariantId(event.target.value)}
+                aria-label="Variant to add"
+                disabled={!isDraft}
+                className={PICKER_CLASS}
+              >
+                <option value="">No variant</option>
+                {selectedProduct.variants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.name} (+{money(variant.extraPrice)})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <input
+              type="number"
+              min={1}
+              value={newLineQuantity}
+              onChange={(event) => setNewLineQuantity(event.target.value)}
+              aria-label="Quantity to add"
+              disabled={!isDraft}
+              className={`${PICKER_CLASS} tabular w-[6rem]`}
             />
+
             <Button
               variant="secondary"
               onClick={handleAddLine}
-              disabled={!isDraft || busy || newLineProductId.trim().length === 0}
+              disabled={!isDraft || busy || newLineProductId === ''}
             >
               Add line
             </Button>

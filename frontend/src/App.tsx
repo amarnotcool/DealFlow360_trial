@@ -13,6 +13,8 @@ import FulfillmentDetail from './pages/internal/fulfillment/FulfillmentDetail';
 import FulfillmentList from './pages/internal/fulfillment/FulfillmentList';
 import InvoiceDetail from './pages/internal/invoices/InvoiceDetail';
 import InvoicesList from './pages/internal/invoices/InvoicesList';
+import ProductCatalog from './pages/internal/products/ProductCatalog';
+import ProductDetail from './pages/internal/products/ProductDetail';
 import QuotationDetail from './pages/internal/quotations/QuotationDetail';
 import QuotationsList from './pages/internal/quotations/QuotationsList';
 import SubscriptionDetail from './pages/internal/subscriptions/SubscriptionDetail';
@@ -115,6 +117,25 @@ export default function App() {
           <RequireRole allow={BILLING_ROLES}>
             <InvoiceDetail />
           </RequireRole>
+        }
+      />
+
+      {/* The catalogue is readable by everyone who builds quotes; only an
+          admin sees the create and edit controls (specs.md §2). */}
+      <Route
+        path="/products"
+        element={
+          <RequireAuth>
+            <ProductCatalog />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/products/:id"
+        element={
+          <RequireAuth>
+            <ProductDetail />
+          </RequireAuth>
         }
       />
 

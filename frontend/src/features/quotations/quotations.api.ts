@@ -22,7 +22,13 @@ export function createQuotation(body: { customerId: string; lines: [] }) {
 
 export function addQuotationLine(
   quotationId: string,
-  body: { productId: string; quantity: number; discountPct: number },
+  body: {
+    productId: string;
+    /** Null when the product is sold as one configuration. */
+    productVariantId?: string | null;
+    quantity: number;
+    discountPct: number;
+  },
 ) {
   return apiPost<QuotationDetailView>(`/quotations/${quotationId}/lines`, body);
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { IconButton, SearchInput } from '../ui';
+import { IconButton } from '../ui';
 import { InternalNav } from './InternalNav';
 
 export interface InternalLayoutProps {
@@ -35,7 +35,6 @@ export function InternalLayout({ breadcrumb = [], title, actions, children }: In
           </div>
 
           <div className="flex items-center gap-sm">
-            <SearchInput placeholder="Search quotes, customers, SKUs" className="w-[18rem] max-w-full" />
             {actions}
             <IconButton label="Notifications">
               <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
