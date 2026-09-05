@@ -25,7 +25,10 @@ import { warehousesRoutes } from './modules/warehouses/warehouses.routes';
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.corsOrigins }));
+  // Content-Disposition is not a CORS-safelisted response header, so without
+  // exposing it the browser cannot read the filename the report export chose
+  // and would save every PDF under a generic fallback name.
+  app.use(cors({ origin: env.corsOrigins, exposedHeaders: ['Content-Disposition'] }));
   app.use(express.json());
 
   app.use(healthRoutes);

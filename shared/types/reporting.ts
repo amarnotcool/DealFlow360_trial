@@ -99,6 +99,21 @@ export interface BackorderMetrics {
   openQuantity: string;
 }
 
+/**
+ * One entry of the report's "Sales Team" filter. specs screen 15 filters by
+ * team; the schema has no team, so the grain is the rep who owns the work.
+ *
+ * This is not the staff directory — that is admin-only (`GET /users`). It is
+ * the reps who actually own quotations, which is exactly what the filter can
+ * usefully offer, and it carries no email, role or account state.
+ */
+export interface ReportOwnerOption {
+  id: string;
+  fullName: string;
+  /** How many quotations this rep owns, so the picker can show the weight. */
+  quotationCount: number;
+}
+
 /** GET /reports/summary */
 export interface ReportSummary {
   filters: AppliedFilters;

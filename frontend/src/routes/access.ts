@@ -22,5 +22,8 @@ export const ADMIN_ONLY: RoleCode[] = ['ADMIN'];
 /** Finance and Ops move stock; an admin keeps the same reach (specs.md §2). */
 export const INVENTORY_ROLES: RoleCode[] = ['FINANCE', 'ADMIN'];
 
+/** Analytics is manager and admin work; finance reads the same money numbers. */
+export const REPORTING_ROLES: RoleCode[] = ['SALES_MANAGER', 'FINANCE', 'ADMIN'];
+
 /** Finance watches the deal-health board; the sales manager and admin work it. */
 export const DEAL_HEALTH_WRITE_ROLES: RoleCode[] = ['SALES_MANAGER', 'ADMIN'];

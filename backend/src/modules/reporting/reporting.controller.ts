@@ -30,6 +30,13 @@ export async function discounts(req: Request, res: Response): Promise<void> {
   res.json({ data, error: null });
 }
 
+/** The "Sales Team" filter's options. */
+export async function owners(_req: Request, res: Response): Promise<void> {
+  const data = await reportingService.listReportOwners();
+
+  res.json({ data, error: null, meta: { total: data.length } });
+}
+
 /**
  * The one endpoint that does not answer in the `{ data, error }` envelope: it
  * answers with a file. The service builds the bytes; this only names them.

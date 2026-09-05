@@ -39,6 +39,10 @@ reportingRoutes.get(
   asyncHandler(controller.discounts),
 );
 
+// The "Sales Team" filter's options, from the quotations themselves rather
+// than the admin-only staff directory.
+reportingRoutes.get('/reports/owners', asyncHandler(controller.owners));
+
 // specs screen 15's "Export PDF": the same filtered report as a file.
 reportingRoutes.get(
   '/reports/export',

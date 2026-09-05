@@ -17,6 +17,7 @@ import FulfillmentList from './pages/internal/fulfillment/FulfillmentList';
 import InvoiceDetail from './pages/internal/invoices/InvoiceDetail';
 import InvoicesList from './pages/internal/invoices/InvoicesList';
 import ProductCatalog from './pages/internal/products/ProductCatalog';
+import AdminReportingDashboard from './pages/internal/reports/AdminReportingDashboard';
 import ProductDetail from './pages/internal/products/ProductDetail';
 import QuotationDetail from './pages/internal/quotations/QuotationDetail';
 import QuotationsList from './pages/internal/quotations/QuotationsList';
@@ -30,7 +31,7 @@ import Preview from './pages/Preview';
 import SystemStatus from './pages/SystemStatus';
 import PortalRoutes from './routes/portal-routes';
 import { RequireAuth, RequireRole } from './routes/guards';
-import { ADMIN_ONLY, APPROVALS_ROLES, BILLING_ROLES } from './routes/access';
+import { ADMIN_ONLY, APPROVALS_ROLES, BILLING_ROLES, REPORTING_ROLES } from './routes/access';
 
 export default function App() {
   return (
@@ -209,6 +210,17 @@ export default function App() {
         element={
           <RequireRole allow={APPROVALS_ROLES}>
             <DealHealthDashboard />
+          </RequireRole>
+        }
+      />
+
+      {/* Analytics is manager, finance and admin work (specs.md §2); the API
+          guards /reports with the same three roles. */}
+      <Route
+        path="/reports"
+        element={
+          <RequireRole allow={REPORTING_ROLES}>
+            <AdminReportingDashboard />
           </RequireRole>
         }
       />

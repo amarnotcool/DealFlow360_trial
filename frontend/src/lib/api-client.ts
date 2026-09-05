@@ -125,6 +125,63 @@ export async function apiList<T, M = { total: number }>(
   return (await apiRequest<T[]>(path, { method: 'GET', surface })) as ApiListResponse<T, M>;
 }
 
+/**
+ * A file download rather than a JSON envelope.
+ *
+ * The export endpoint answers with bytes, so it cannot go through apiRequest —
+ * but it still needs the session header, which a plain `<a href>` cannot carry.
+ * The filename comes from the server's Content-Disposition, so the browser
+ * saves the report under the name the API chose for it.
+ */
+export interface DownloadResult {
+  blob: Blob | null;
+  filename: string;
+  error: ApiError | null;
+}
+
+const FILENAME = /filename="?([^";]+)"?/i;
+
+export async function apiDownload(
+  path: string,
+  fallbackFilename: string,
+  surface: Surface = 'internal',
+): Promise<DownloadResult> {
+  const token = tokens[surface];
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (response.status === 401) {
+      setToken(surface, null);
+      window.dispatchEvent(new CustomEvent(EXPIRED_EVENT[surface]));
+    }
+
+    if (!response.ok) {
+      // A failure still answers in the envelope, so the real message survives.
+      const body = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
+      return {
+        blob: null,
+        filename: fallbackFilename,
+        error: body?.error ?? { code: `HTTP_${response.status}`, message: response.statusText },
+      };
+    }
+
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const matched = FILENAME.exec(disposition);
+
+    return { blob: await response.blob(), filename: matched?.[1] ?? fallbackFilename, error: null };
+  } catch (cause) {
+    return {
+      blob: null,
+      filename: fallbackFilename,
+      error: transportError(cause instanceof Error ? cause.message : 'Download failed'),
+    };
+  }
+}
+
 function withBody<T>(
   method: string,
   path: string,

@@ -34,6 +34,7 @@ import type {
   QuotationMetrics,
   ReportQuotationRow,
   ReportQuotationsMeta,
+  ReportOwnerOption,
   ReportSummary,
   SubscriptionMetrics,
   ValueMetrics,
@@ -546,6 +547,39 @@ export async function getDiscountReport(filters: ReportFiltersQuery): Promise<Di
     overall,
     approvals: quotationPart.approvals,
   };
+}
+
+/**
+ * The reps the "Sales Team" filter can offer: whoever owns a quotation, with
+ * how many they own.
+ *
+ * It deliberately does not read the staff directory. `GET /users` is admin-only
+ * (specs.md §2), and a manager needs a filter list, not everyone's email and
+ * account state — so this answers from the quotations themselves and returns
+ * two fields.
+ */
+export async function listReportOwners(): Promise<ReportOwnerOption[]> {
+  const grouped = await prisma.quotation.groupBy({
+    by: ['ownerUserId'],
+    _count: { _all: true },
+  });
+
+  if (grouped.length === 0) return [];
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: grouped.map((row) => row.ownerUserId) } },
+    select: { id: true, fullName: true },
+  });
+
+  const nameById = new Map(users.map((user) => [user.id, user.fullName]));
+
+  return grouped
+    .map((row) => ({
+      id: row.ownerUserId,
+      fullName: nameById.get(row.ownerUserId) ?? 'Unknown user',
+      quotationCount: row._count._all,
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
 // ---------------------------------------------------------------------------
