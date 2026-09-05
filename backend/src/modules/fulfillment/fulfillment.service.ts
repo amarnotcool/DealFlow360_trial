@@ -22,6 +22,7 @@ import type { SplitAllocatorInput, SplitAllocatorResult } from '@dealflow360/sha
 import { prisma } from '../../lib/prisma-client';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
 import { recordAudit } from '../../shared/audit/audit.service';
+import { invoiceShippedFulfillments } from '../billing/billing.service';
 import { allocateSplit } from './split-allocator';
 
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value);
@@ -725,4 +726,138 @@ async function buildManualPayload(
       lines.reduce((sum, line) => sum + line.backorderQty, 0).toFixed(2),
     ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Ship — the event billing reconciles against
+// ---------------------------------------------------------------------------
+
+/** Moves reserved stock out of the warehouse when a shipment leaves. */
+async function releaseReservedStock(
+  tx: Prisma.TransactionClient,
+  warehouseId: string,
+  productId: string,
+  productVariantId: string | null,
+  quantity: Prisma.Decimal,
+): Promise<void> {
+  let row = await tx.inventoryStock.findFirst({ where: { warehouseId, productId, productVariantId } });
+  if (!row && productVariantId !== null) {
+    row = await tx.inventoryStock.findFirst({ where: { warehouseId, productId, productVariantId: null } });
+  }
+  if (!row) {
+    throw new ConflictError(`No stock row for product ${productId} in warehouse ${warehouseId}`);
+  }
+
+  await tx.inventoryStock.update({
+    where: { id: row.id },
+    data: { reserved: row.reserved.minus(quantity), onHand: row.onHand.minus(quantity) },
+  });
+}
+
+/**
+ * Ships every reserved fulfillment on the order.
+ *
+ * Shipping is what lets billing happen: specs.md §4 says nothing is billed
+ * before it ships, so the one-time invoice for the shipped quantities is raised
+ * here, in the same transaction. A backordered quantity ships nothing and is
+ * therefore not billed.
+ */
+export async function shipFulfillments(salesOrderId: string, actorUserId: string) {
+  await prisma.$transaction(async (tx) => {
+    const order = await loadOrder(tx, salesOrderId);
+    assertFulfillable(order);
+
+    const pending = order.fulfillments.filter(
+      (fulfillment) =>
+        fulfillment.status === FulfillmentStatus.PENDING ||
+        fulfillment.status === FulfillmentStatus.RESERVED,
+    );
+    if (pending.length === 0) {
+      throw new ConflictError(`Sales order ${order.number} has nothing reserved to ship`);
+    }
+
+    const lineById = new Map(order.lines.map((line) => [line.id, line]));
+    const shippedAt = new Date();
+
+    for (const fulfillment of pending) {
+      const entries = fulfillment.lines as unknown as Array<{
+        salesOrderLineId: string;
+        productId: string;
+        productVariantId: string | null;
+        quantity: string;
+      }>;
+
+      for (const entry of entries) {
+        const line = lineById.get(entry.salesOrderLineId);
+        if (!line) {
+          throw new ConflictError(`Shipment references line ${entry.salesOrderLineId}, which is not on this order`);
+        }
+
+        const quantity = D(entry.quantity);
+        await releaseReservedStock(
+          tx,
+          fulfillment.warehouseId,
+          entry.productId,
+          entry.productVariantId,
+          quantity,
+        );
+
+        await tx.salesOrderLine.update({
+          where: { id: line.id },
+          data: { quantityFulfilled: line.quantityFulfilled.plus(quantity) },
+        });
+        lineById.set(line.id, { ...line, quantityFulfilled: line.quantityFulfilled.plus(quantity) });
+      }
+
+      await tx.fulfillment.update({
+        where: { id: fulfillment.id },
+        data: { status: FulfillmentStatus.SHIPPED, shippedAt },
+      });
+    }
+
+    // Only lines that can ship decide whether an order is complete: a recurring
+    // line bills on its schedule, and a non-stock line such as a setup service
+    // is never allocated, so neither can hold the order at PARTIALLY_FULFILLED.
+    const shippableProducts = new Set(
+      (
+        await tx.inventoryStock.findMany({
+          where: { productId: { in: [...lineById.values()].map((line) => line.productId) } },
+          select: { productId: true },
+        })
+      ).map((row) => row.productId),
+    );
+
+    const everythingShipped = [...lineById.values()]
+      .filter((line) => line.lineType !== LineType.RECURRING && shippableProducts.has(line.productId))
+      .every((line) => line.quantityFulfilled.greaterThanOrEqualTo(line.quantity));
+
+    await tx.salesOrder.update({
+      where: { id: salesOrderId },
+      data: {
+        status: everythingShipped ? SalesOrderStatus.FULFILLED : SalesOrderStatus.PARTIALLY_FULFILLED,
+      },
+    });
+
+    const invoiceId = await invoiceShippedFulfillments(
+      tx,
+      salesOrderId,
+      pending.map((fulfillment) => fulfillment.id),
+      actorUserId,
+    );
+
+    await recordAudit(tx, {
+      entityType: 'sales_order',
+      entityId: salesOrderId,
+      action: AuditAction.UPDATE,
+      userId: actorUserId,
+      reason: `Shipped ${pending.length} shipment(s)`,
+      changes: {
+        fulfillmentIds: pending.map((fulfillment) => fulfillment.id),
+        invoiceId,
+        orderStatus: everythingShipped ? SalesOrderStatus.FULFILLED : SalesOrderStatus.PARTIALLY_FULFILLED,
+      },
+    });
+  });
+
+  return getFulfillment(salesOrderId);
 }

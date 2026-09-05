@@ -6,9 +6,11 @@ import express from 'express';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { approvalsRoutes } from './modules/approvals/approvals.routes';
+import { billingRoutes } from './modules/billing/billing.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
+import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes';
 
 export function createApp() {
   const app = express();
@@ -20,6 +22,8 @@ export function createApp() {
   app.use(quotationsRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);
+  app.use(subscriptionsRoutes);
+  app.use(billingRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -35,7 +35,15 @@ const ID = {
   prodWarranty: '44444444-4444-4444-8444-000000000003',
   variantLaptop: '44444444-4444-4444-8444-000000000101',
 
+  prodSupport: '33333333-3333-4333-8333-000000000004',
+
   planSupportPlus: '55555555-5555-4555-8555-000000000001',
+  planSupportBasic: '55555555-5555-4555-8555-000000000002',
+  planSupportPremium: '55555555-5555-4555-8555-000000000003',
+
+  quotationHybrid: 'cccccccc-cccc-4ccc-8ccc-000000000002',
+  lineHybridWarranty: 'dddddddd-dddd-4ddd-8ddd-000000000101',
+  lineHybridSupport: 'dddddddd-dddd-4ddd-8ddd-000000000102',
 
   roleSalesRep: '66666666-6666-4666-8666-000000000001',
   roleSalesManager: '66666666-6666-4666-8666-000000000002',
@@ -101,6 +109,15 @@ const discountAmount = subtotalAmount.minus(totalAmount);
 const marginAmount = allLines.reduce((sum, l) => sum.plus(l.marginAmount), D(0));
 const marginPct = totalAmount.isZero() ? D(0) : marginAmount.div(totalAmount).mul(100).toDecimalPlaces(2);
 
+// The hybrid quote's own money, kept apart from the worked example's totals.
+const hybridWarrantyLine = lineMoney('15000', '5000', '1', '0');
+const hybridSupportLine = lineMoney('5000', '1500', '1', '0');
+const hybridSubtotal = hybridWarrantyLine.lineSubtotal.plus(hybridSupportLine.lineSubtotal);
+const hybridMargin = hybridWarrantyLine.marginAmount.plus(hybridSupportLine.marginAmount);
+const hybridMarginPct = hybridSubtotal.isZero()
+  ? D(0)
+  : hybridMargin.div(hybridSubtotal).mul(100).toDecimalPlaces(2);
+
 // Dev-only placeholder credential; every seeded login shares it.
 const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync('dealflow360', 10);
 
@@ -110,6 +127,13 @@ async function main() {
     // written by the running app (POST /quotations/:id/confirm and the
     // fulfillment module), so a reseed has to clear them too.
     await tx.auditLog.deleteMany();
+    await tx.payment.deleteMany();
+    await tx.creditNote.deleteMany();
+    await tx.invoiceLine.deleteMany();
+    await tx.billingSchedule.deleteMany();
+    await tx.prorationEvent.deleteMany();
+    await tx.invoice.deleteMany();
+    await tx.subscription.deleteMany();
     await tx.backorder.deleteMany();
     await tx.fulfillment.deleteMany();
     await tx.fulfillmentSplitSuggestion.deleteMany();
@@ -205,6 +229,8 @@ async function main() {
         { id: ID.prodLaptop, sku: 'HW-LAPTOP-PRO-14', name: 'Laptop Pro 14', categoryId: ID.catHardware, listPrice: D('120000.00'), unitCost: D('90000.00') },
         { id: ID.prodSetup, sku: 'SV-ONSITE-SETUP', name: 'Onsite Setup Service', categoryId: ID.catServices, listPrice: D('20000.00'), unitCost: D('8000.00') },
         { id: ID.prodWarranty, sku: 'HW-EXT-WARRANTY', name: 'Extended Warranty', categoryId: ID.catHardware, listPrice: D('15000.00'), unitCost: D('5000.00') },
+        // Sold as a recurring line, so it carries no stock and never ships.
+        { id: ID.prodSupport, sku: 'SV-SUPPORT-PLUS', name: 'Support Plus', categoryId: ID.catServices, listPrice: D('5000.00'), unitCost: D('1500.00'), isSubscription: true, recurringCycle: BillingCycle.MONTHLY },
       ],
     });
 
@@ -219,14 +245,33 @@ async function main() {
     });
 
     // --- Subscription plan -------------------------------------------------
-    await tx.subscriptionPlan.create({
-      data: {
-        id: ID.planSupportPlus,
-        code: 'SUPPORT_PLUS',
-        name: 'Support Plus',
-        billingCycle: BillingCycle.MONTHLY,
-        recurringPrice: D('5000.00'),
-      },
+    // Three tiers on one cycle: a subscription can move up or down from
+    // Support Plus, so a mid-cycle change has somewhere real to go.
+    await tx.subscriptionPlan.createMany({
+      data: [
+        {
+          id: ID.planSupportBasic,
+          code: 'SUPPORT_BASIC',
+          name: 'Support Basic',
+          billingCycle: BillingCycle.MONTHLY,
+          recurringPrice: D('3000.00'),
+        },
+        {
+          id: ID.planSupportPlus,
+          code: 'SUPPORT_PLUS',
+          name: 'Support Plus',
+          productId: ID.prodSupport,
+          billingCycle: BillingCycle.MONTHLY,
+          recurringPrice: D('5000.00'),
+        },
+        {
+          id: ID.planSupportPremium,
+          code: 'SUPPORT_PREMIUM',
+          name: 'Support Premium',
+          billingCycle: BillingCycle.MONTHLY,
+          recurringPrice: D('8000.00'),
+        },
+      ],
     });
 
     // --- Customer & portal contact -----------------------------------------
@@ -335,6 +380,59 @@ async function main() {
           sequence: 3,
           description: 'Extended Warranty',
           ...warrantyLine,
+        },
+      ],
+    });
+
+    // --- Hybrid quotation (specs.md §4 hybrid billing) ----------------------
+    //
+    // The worked example above is the risk fixture and stays exactly as specs.md
+    // states it. Hybrid billing needs a second quote: one one-time line that
+    // ships and bills against the shipment, and one recurring line that becomes
+    // a subscription on confirm and bills on its own cycle. Both are at list
+    // price, so this quote carries no discount risk and does not disturb the
+    // fixture.
+    await tx.quotation.create({
+      data: {
+        id: ID.quotationHybrid,
+        number: 'Q-2026-0002',
+        customerId: ID.customerAcme,
+        customerContactId: ID.contactAcme,
+        ownerUserId: ID.userSalesRep,
+        status: QuotationStatus.DRAFT,
+        subtotalAmount: hybridSubtotal.toDecimalPlaces(2),
+        discountAmount: D('0.00'),
+        oneTimeTotalAmount: hybridWarrantyLine.lineTotal,
+        recurringTotalAmount: hybridSupportLine.lineTotal,
+        totalAmount: hybridSubtotal.toDecimalPlaces(2),
+        marginAmount: hybridMargin.toDecimalPlaces(2),
+        marginPct: hybridMarginPct,
+        notes: 'Hybrid order: one-time hardware plus a monthly subscription.',
+      },
+    });
+
+    await tx.quotationLine.createMany({
+      data: [
+        {
+          id: ID.lineHybridWarranty,
+          quotationId: ID.quotationHybrid,
+          productId: ID.prodWarranty,
+          categoryId: ID.catHardware,
+          lineType: LineType.ONE_TIME,
+          sequence: 1,
+          description: 'Extended Warranty',
+          ...hybridWarrantyLine,
+        },
+        {
+          id: ID.lineHybridSupport,
+          quotationId: ID.quotationHybrid,
+          productId: ID.prodSupport,
+          categoryId: ID.catServices,
+          lineType: LineType.RECURRING,
+          subscriptionPlanId: ID.planSupportPlus,
+          sequence: 2,
+          description: 'Support Plus — monthly',
+          ...hybridSupportLine,
         },
       ],
     });

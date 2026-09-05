@@ -42,3 +42,11 @@ fulfillmentRoutes.post(
   validate('body', overrideSchema),
   asyncHandler(controller.override),
 );
+
+// Shipping is what lets billing happen (specs.md §4 reconciliation rule).
+fulfillmentRoutes.post(
+  '/fulfillment/:id/ship',
+  validate('params', idParamSchema),
+  validate('body', suggestSchema),
+  asyncHandler(controller.ship),
+);

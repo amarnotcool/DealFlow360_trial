@@ -44,3 +44,9 @@ export async function override(req: Request, res: Response): Promise<void> {
   });
   res.json({ data: order, error: null });
 }
+
+export async function ship(req: Request, res: Response): Promise<void> {
+  const { actorUserId } = req.body as SuggestBody;
+  const order = await fulfillmentService.shipFulfillments(req.params.id as string, actorUserId);
+  res.json({ data: order, error: null });
+}

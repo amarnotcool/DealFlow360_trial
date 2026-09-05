@@ -5,6 +5,10 @@ export default defineConfig({
     // Tests live next to the code they cover, plus the named scaffolds under
     // backend/tests/ that have actually been written. The remaining empty
     // scaffolds are listed as they are filled in.
-    include: ['src/**/*.test.ts', 'tests/fulfillment-split.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'tests/fulfillment-split.test.ts',
+      'tests/subscription-proration.test.ts',
+    ],
   },
 });

@@ -11,6 +11,7 @@ import { prisma } from '../../lib/prisma-client';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
 import { recordAudit } from '../../shared/audit/audit.service';
 import { computeDiscountRisk } from '../discount-engine/discount-engine.service';
+import { createSubscriptionsForOrder } from '../subscriptions/subscriptions.service';
 
 const D = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value);
 const HUNDRED = D(100);
@@ -716,13 +717,22 @@ export async function confirmQuotation(quotationId: string, actorUserId: string)
       data: { status: QuotationStatus.CONFIRMED, confirmedAt: new Date(), lastActivityAt: new Date() },
     });
 
+    // A confirmed order carries its recurring lines straight into
+    // subscriptions, so one confirm produces both halves of a hybrid order.
+    const subscriptionIds = await createSubscriptionsForOrder(tx, salesOrder.id, actorUserId);
+
     await recordAudit(tx, {
       entityType: 'quotation',
       entityId: quotationId,
       action: AuditAction.CONFIRM,
       userId: actorUserId,
       reason: `Confirmed — sales order ${salesOrder.number} created`,
-      changes: { salesOrderId: salesOrder.id, number: salesOrder.number, lineCount: quotation.lines.length },
+      changes: {
+        salesOrderId: salesOrder.id,
+        number: salesOrder.number,
+        lineCount: quotation.lines.length,
+        subscriptionIds,
+      },
     });
 
     return salesOrder.id;
