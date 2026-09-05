@@ -2,11 +2,14 @@
 // the fulfillment demo needs (one split case, one backorder case).
 //
 // Idempotent: every run wipes the seeded tables and re-inserts inside a single
-// transaction, so running it twice leaves the same row counts.
+// transaction, then replays the discount snapshot over the quotations it wrote,
+// so running it twice leaves the same rows and the same numbers.
 //
 // Risk fields (applicable_ceiling_pct, overage_pct, risk_score_factor,
-// quotation.risk_score) are intentionally left at their defaults — computing
-// them is the discount engine's job, not the seed's.
+// quotation.risk_score) are not computed here: the snapshot pass at the end of
+// main() hands each seeded quotation to recomputeQuotation, the same function
+// the API runs after an edit, so the discount engine remains the only place the
+// maths lives.
 
 import 'dotenv/config';
 import {
@@ -21,6 +24,8 @@ import {
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+import { recomputeQuotation } from '../src/modules/quotations/quotations.service';
+
 const prisma = new PrismaClient();
 
 const D = (value: string | number) => new Prisma.Decimal(value);
@@ -34,6 +39,8 @@ const ID = {
   catHardware: '22222222-2222-4222-8222-000000000001',
   catServices: '22222222-2222-4222-8222-000000000002',
 
+  ruleBronze: '33333333-3333-4333-8333-000000000005',
+  ruleSilver: '33333333-3333-4333-8333-000000000006',
   ruleGold: '33333333-3333-4333-8333-000000000001',
   ruleHardware: '33333333-3333-4333-8333-000000000002',
   ruleServices: '33333333-3333-4333-8333-000000000003',
@@ -255,6 +262,12 @@ async function main() {
     // --- Discount rules (single-axis) --------------------------------------
     await tx.discountRule.createMany({
       data: [
+        // Every tier carries its own rule, so a tier's ceiling is the one the
+        // engine actually applies. With only Gold ruled, a Bronze or Silver
+        // quote fell through to the 5% global backstop while the tier table
+        // advertised 10% and 12% — the same number meaning two things.
+        { id: ID.ruleBronze, customerTierId: ID.tierBronze, ceilingPct: D('10.00'), description: 'Bronze tier ceiling' },
+        { id: ID.ruleSilver, customerTierId: ID.tierSilver, ceilingPct: D('12.00'), description: 'Silver tier ceiling' },
         { id: ID.ruleGold, customerTierId: ID.tierGold, ceilingPct: D('15.00'), description: 'Gold tier ceiling' },
         { id: ID.ruleHardware, categoryId: ID.catHardware, ceilingPct: D('15.00'), description: 'Hardware category ceiling' },
         { id: ID.ruleServices, categoryId: ID.catServices, ceilingPct: D('10.00'), description: 'Services category ceiling' },
@@ -743,6 +756,53 @@ async function main() {
     });
   });
 
+  // --- Discount snapshot ---------------------------------------------------
+  //
+  // Every row above is written straight into the tables, so nothing has run the
+  // discount engine over these quotations: each line would carry a zero ceiling
+  // and a zero overage, and the reporting screen would report no over-limit
+  // lines at all while the data plainly holds some — Q-2026-0001's Services
+  // line is discounted 18% against a 10% ceiling.
+  //
+  // This replays recomputeQuotation, the same function the API runs after every
+  // edit, so the snapshot is the application's own and the maths is not written
+  // a second time here (CLAUDE.md rule 1). It fills the per-line ceiling and
+  // overage, the blended score and risk level, the approval flag and the frozen
+  // risk_score_factor rows — and nothing else. No status is touched, so a
+  // seeded draft stays a draft, and no approval step is raised: a quote still
+  // has to be submitted for that.
+  //
+  // It runs after the seed transaction rather than inside it. The wipe and the
+  // inserts already fill that transaction, and Prisma's interactive
+  // transactions time out at five seconds.
+  const snapshotQuotationIds = [
+    ID.quotation,
+    ID.quotationHybrid,
+    ID.quotationStalled,
+    ID.quotationNormalA,
+    ID.quotationNormalB,
+    ID.quotationNormalC,
+    ID.quotationAnomaly,
+    ID.quotationLate,
+  ];
+
+  for (const quotationId of snapshotQuotationIds) {
+    const before = await prisma.quotation.findUniqueOrThrow({
+      where: { id: quotationId },
+      select: { lastActivityAt: true },
+    });
+
+    await prisma.$transaction((tx) => recomputeQuotation(tx, quotationId));
+
+    // recomputeQuotation stamps lastActivityAt, as an edit should. Here that
+    // would un-stall the deal-health fixture that is deliberately 30 days
+    // idle, so each quotation keeps the activity date the seed gave it.
+    await prisma.quotation.update({
+      where: { id: quotationId },
+      data: { lastActivityAt: before.lastActivityAt },
+    });
+  }
+
   const counts = {
     customerTier: await prisma.customerTier.count(),
     category: await prisma.category.count(),
@@ -763,6 +823,10 @@ async function main() {
     quotationLine: await prisma.quotationLine.count(),
     salesOrder: await prisma.salesOrder.count(),
     fulfillment: await prisma.fulfillment.count(),
+    riskScoreFactor: await prisma.riskScoreFactor.count(),
+    // Proof the snapshot pass actually ran: a seed with none of these has
+    // silently gone back to reporting zero over-limit lines.
+    linesOverCeiling: await prisma.quotationLine.count({ where: { overagePct: { gt: 0 } } }),
   };
 
   console.log('Seed complete. Row counts:');
