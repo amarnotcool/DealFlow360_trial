@@ -2,6 +2,7 @@ export * from './types/approval';
 export * from './types/auth';
 export * from './types/billing';
 export * from './types/common';
+export * from './types/customer';
 export * from './types/deal-health';
 export * from './types/fulfillment';
 export * from './types/negotiation';

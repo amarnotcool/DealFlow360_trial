@@ -8,12 +8,14 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { approvalsRoutes } from './modules/approvals/approvals.routes';
 import { authRoutes } from './modules/auth/auth.routes';
 import { billingRoutes } from './modules/billing/billing.routes';
+import { customersRoutes } from './modules/customers/customers.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
 import { portalRoutes } from './modules/portal/portal.routes';
 import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
+import { rbacRoutes } from './modules/rbac/rbac.routes';
 import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes';
 import { warehousesRoutes } from './modules/warehouses/warehouses.routes';
 
@@ -28,6 +30,8 @@ export function createApp() {
   // itself so a route can never be mounted without one by accident.
   app.use(authRoutes);
   app.use(productsRoutes);
+  app.use(customersRoutes);
+  app.use(rbacRoutes);
   app.use(warehousesRoutes);
   app.use(quotationsRoutes);
   app.use(approvalsRoutes);
