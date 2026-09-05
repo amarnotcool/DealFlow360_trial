@@ -5,7 +5,8 @@ import { usePortalAuth } from '../../features/auth/usePortalAuth';
 import { cn } from '../ui/cn';
 
 /** specs.md screen 11: the portal has its own three-item nav, not the rail. */
-const PORTAL_NAV = [
+const PORTAL_NAV: Array<{ label: string; to: string; end?: boolean }> = [
+  { label: 'Overview', to: '/portal', end: true },
   { label: 'My Quotation', to: '/portal/quotations' },
   { label: 'Messages', to: '/portal/messages' },
   { label: 'Profile', to: '/portal/profile' },
@@ -26,6 +27,7 @@ export function PortalNav() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end ?? false}
               className={({ isActive }) =>
                 cn(
                   'rounded-full px-md py-[0.45rem] text-title-sm transition-all duration-150',

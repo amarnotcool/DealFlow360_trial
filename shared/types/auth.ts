@@ -43,6 +43,8 @@ export interface PortalUser {
   fullName: string;
   email: string;
   customerName: string;
+  /** The account's tier, named for the customer — no ceiling percentage. */
+  customerTier: { code: string; name: string };
 }
 
 export interface PortalLoginResponse {

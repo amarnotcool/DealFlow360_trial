@@ -7,6 +7,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import Messages from '../pages/portal/Messages';
+import Overview from '../pages/portal/Overview';
 import MyQuotations from '../pages/portal/MyQuotations';
 import NegotiationScreen from '../pages/portal/NegotiationScreen';
 import PortalLogin from '../pages/portal/PortalLogin';
@@ -17,6 +18,16 @@ export default function PortalRoutes() {
   return (
     <Routes>
       <Route path="login" element={<PortalLogin />} />
+
+      {/* The landing screen: where this customer's quotations stand. */}
+      <Route
+        index
+        element={
+          <RequirePortalAuth>
+            <Overview />
+          </RequirePortalAuth>
+        }
+      />
 
       <Route
         path="quotations"
@@ -51,7 +62,7 @@ export default function PortalRoutes() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/portal/quotations" replace />} />
+      <Route path="*" element={<Navigate to="/portal" replace />} />
     </Routes>
   );
 }

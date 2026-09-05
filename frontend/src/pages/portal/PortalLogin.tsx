@@ -24,7 +24,7 @@ export default function PortalLogin() {
   const [busy, setBusy] = useState(false);
 
   if (contact) {
-    return <Navigate to="/portal/quotations" replace />;
+    return <Navigate to="/portal" replace />;
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -39,7 +39,7 @@ export default function PortalLogin() {
     }
 
     const from = (location.state as { from?: string } | null)?.from;
-    navigate(from && from !== '/portal/login' ? from : '/portal/quotations', { replace: true });
+    navigate(from && from !== '/portal/login' ? from : '/portal', { replace: true });
   }
 
   return (

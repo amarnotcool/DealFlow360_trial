@@ -10,7 +10,15 @@ import { UnauthorizedError } from '../../lib/errors';
 import { signPortalToken } from '../../lib/jwt';
 
 const contactWithCustomer = {
-  customer: { select: { id: true, name: true } },
+  customer: {
+    select: {
+      id: true,
+      name: true,
+      // The tier's name reaches the customer; its ceiling never does — that is
+      // internal discount policy, not the customer's business.
+      customerTier: { select: { code: true, name: true } },
+    },
+  },
 } as const;
 
 export async function login(email: string, password: string): Promise<PortalLoginResponse> {
@@ -55,7 +63,7 @@ function toPortalUser(contact: {
   customerId: string;
   fullName: string;
   email: string;
-  customer: { name: string };
+  customer: { name: string; customerTier: { code: string; name: string } };
 }): PortalUser {
   return {
     contactId: contact.id,
@@ -63,5 +71,6 @@ function toPortalUser(contact: {
     fullName: contact.fullName,
     email: contact.email,
     customerName: contact.customer.name,
+    customerTier: contact.customer.customerTier,
   };
 }
