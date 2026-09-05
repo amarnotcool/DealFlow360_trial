@@ -79,6 +79,7 @@ const portalDetailSelect = {
       status: true,
       comment: true,
       counterDiscountPct: true,
+      requestedDeliveryDate: true,
       responseNote: true,
       respondedAt: true,
       createdAt: true,
@@ -195,6 +196,8 @@ export async function negotiate(
           comment: item.comment ?? null,
           counterDiscountPct:
             item.counterDiscountPct == null ? null : new Prisma.Decimal(item.counterDiscountPct),
+          requestedDeliveryDate:
+            item.requestedDeliveryDate == null ? null : new Date(item.requestedDeliveryDate),
         },
       });
     }
@@ -220,6 +223,7 @@ export async function negotiate(
         requests: items.map((item) => ({
           quotationLineId: item.quotationLineId ?? null,
           counterDiscountPct: item.counterDiscountPct ?? null,
+          requestedDeliveryDate: item.requestedDeliveryDate ?? null,
           hasComment: Boolean(item.comment),
         })),
       },

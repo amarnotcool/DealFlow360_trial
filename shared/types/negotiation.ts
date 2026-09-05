@@ -22,6 +22,7 @@ export interface PortalNegotiationView {
   status: NegotiationStatus;
   comment: string | null;
   counterDiscountPct: string | null;
+  requestedDeliveryDate: string | null;
   responseNote: string | null;
   respondedAt: string | null;
   createdAt: string;
@@ -68,6 +69,8 @@ export interface PortalNegotiationInput {
   quotationLineId?: string | null;
   comment?: string | null;
   counterDiscountPct?: number | null;
+  /** ISO date the customer would like the order delivered by. */
+  requestedDeliveryDate?: string | null;
 }
 
 /**

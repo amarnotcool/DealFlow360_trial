@@ -19,6 +19,7 @@ import SubscriptionDetail from './pages/internal/subscriptions/SubscriptionDetai
 import SubscriptionsList from './pages/internal/subscriptions/SubscriptionsList';
 import Preview from './pages/Preview';
 import SystemStatus from './pages/SystemStatus';
+import PortalRoutes from './routes/portal-routes';
 import { RequireAuth, RequireRole } from './routes/guards';
 import { APPROVALS_ROLES, BILLING_ROLES } from './routes/access';
 
@@ -26,6 +27,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* The customer portal is its own surface, with its own session. */}
+      <Route path="/portal/*" element={<PortalRoutes />} />
 
       <Route path="/" element={<Navigate to="/quotations" replace />} />
 

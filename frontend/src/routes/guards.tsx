@@ -7,6 +7,7 @@ import type { RoleCode } from '@dealflow360/shared';
 
 import { LoadingCard } from '../components/ui';
 import { useAuth } from '../features/auth/useAuth';
+import { usePortalAuth } from '../features/auth/usePortalAuth';
 
 /** Sends a signed-out visitor to the login page, remembering where they were. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -38,6 +39,29 @@ export function RequireRole({ allow, children }: { allow: RoleCode[]; children: 
 
   if (!allow.includes(user.role)) {
     return <Navigate to="/quotations" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+/**
+ * The portal's own guard. A signed-out customer lands on the portal login, not
+ * the staff one — the two surfaces never hand visitors to each other.
+ */
+export function RequirePortalAuth({ children }: { children: ReactNode }) {
+  const { contact, loading } = usePortalAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="p-xl">
+        <LoadingCard label="Session" />
+      </div>
+    );
+  }
+
+  if (!contact) {
+    return <Navigate to="/portal/login" replace state={{ from: location.pathname }} />;
   }
 
   return <>{children}</>;
