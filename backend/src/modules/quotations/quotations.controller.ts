@@ -25,6 +25,11 @@ export async function detail(req: Request, res: Response): Promise<void> {
   res.json({ data: quotation, error: null });
 }
 
+export async function auditTrail(req: Request, res: Response): Promise<void> {
+  const { rows, total } = await quotationsService.getAuditTrail(req.params.id as string);
+  res.json({ data: rows, error: null, meta: { total } });
+}
+
 export async function create(req: Request, res: Response): Promise<void> {
   const body = req.body as CreateQuotationBody;
   const actor = currentUser(req);

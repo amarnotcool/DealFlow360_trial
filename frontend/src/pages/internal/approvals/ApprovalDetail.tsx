@@ -8,6 +8,7 @@ import { useParams } from 'react-router-dom';
 import type { ApiError, ApprovalDetailView } from '@dealflow360/shared';
 
 import { InternalLayout } from '../../../components/layout/InternalLayout';
+import AuditTrail from './components/AuditTrail';
 import {
   Badge,
   Button,
@@ -201,6 +202,8 @@ export default function ApprovalDetail() {
           </tbody>
         </Table>
       </TableShell>
+
+      <AuditTrail quotationId={id} />
 
       {pendingStep && canDecide && (
         <Card className="mb-lg">

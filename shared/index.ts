@@ -1,4 +1,5 @@
 export * from './types/approval';
+export * from './types/audit';
 export * from './types/auth';
 export * from './types/billing';
 export * from './types/common';

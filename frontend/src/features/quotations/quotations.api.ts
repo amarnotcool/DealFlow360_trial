@@ -1,4 +1,5 @@
 import type {
+  AuditTrailEntryView,
   QuotationDetailView,
   QuotationListItem,
   QuotationStatus,
@@ -15,6 +16,10 @@ export function fetchQuotations(status?: QuotationStatus) {
 
 export function fetchRecommendations(quotationId: string) {
   return apiList<RecommendationView>(`/quotations/${quotationId}/recommendations`);
+}
+
+export function fetchAuditTrail(quotationId: string) {
+  return apiList<AuditTrailEntryView>(`/quotations/${quotationId}/audit`);
 }
 
 export function fetchQuotation(id: string) {

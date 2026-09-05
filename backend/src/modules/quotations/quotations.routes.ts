@@ -21,10 +21,19 @@ export const quotationsRoutes = Router();
 const buildsQuotes = requireRole('SALES_REP', 'ADMIN');
 // A confirmed quote becomes an order — the rep who owns it or their manager.
 const confirmsOrders = requireRole('SALES_REP', 'SALES_MANAGER', 'ADMIN');
+// The approval desk reads the quote's story (screen 6); a rep never sees it.
+const readsAuditTrail = requireRole('SALES_MANAGER', 'FINANCE', 'ADMIN');
 
 // Path-scoped so this router never touches a request meant for another module:
 // a bare `use(auth)` would answer for every path in the app.
 quotationsRoutes.use('/quotations', auth);
+
+quotationsRoutes.get(
+  '/quotations/:id/audit',
+  readsAuditTrail,
+  validate('params', idParamSchema),
+  asyncHandler(controller.auditTrail),
+);
 
 quotationsRoutes.get('/quotations', validate('query', listQuerySchema), asyncHandler(controller.list));
 

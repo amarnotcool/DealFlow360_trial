@@ -312,6 +312,77 @@ export async function getQuotation(id: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Audit trail (screen 6)
+// ---------------------------------------------------------------------------
+
+/** The portal contact a customer-side entry names in its own changes. */
+function portalContactIdOf(changes: Prisma.JsonValue): string | null {
+  if (typeof changes !== 'object' || changes === null || Array.isArray(changes)) {
+    return null;
+  }
+  const id = (changes as Record<string, Prisma.JsonValue | undefined>).portalContactId;
+  return typeof id === 'string' ? id : null;
+}
+
+/**
+ * The quote's story: its own entries plus every line's, oldest first. A read,
+ * never a write — reading the audit log writes no audit row.
+ */
+export async function getAuditTrail(quotationId: string) {
+  const quotation = await prisma.quotation.findUnique({
+    where: { id: quotationId },
+    select: { id: true, lines: { select: { id: true } } },
+  });
+  if (!quotation) {
+    throw new NotFoundError('Quotation', quotationId);
+  }
+
+  const lineIds = quotation.lines.map((line) => line.id);
+  const entries = await prisma.auditLog.findMany({
+    where: {
+      OR: [
+        { entityType: 'quotation', entityId: quotationId },
+        { entityType: 'quotation_line', entityId: { in: lineIds } },
+      ],
+    },
+    include: { user: { select: { id: true, fullName: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const contactIds = [
+    ...new Set(
+      entries
+        .map((entry) => portalContactIdOf(entry.changes))
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const contacts =
+    contactIds.length === 0
+      ? []
+      : await prisma.customerContact.findMany({
+          where: { id: { in: contactIds } },
+          select: { id: true, fullName: true },
+        });
+  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
+
+  const rows = entries.map((entry) => {
+    const contactId = portalContactIdOf(entry.changes);
+    return {
+      id: entry.id,
+      entityType: entry.entityType,
+      action: entry.action,
+      reason: entry.reason,
+      createdAt: entry.createdAt,
+      actor: entry.user,
+      portalContact: contactId ? (contactById.get(contactId) ?? null) : null,
+      changes: entry.changes,
+    };
+  });
+
+  return { rows, total: rows.length };
+}
+
+// ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
 
