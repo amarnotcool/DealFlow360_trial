@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { IconButton } from '../ui';
 import { InternalNav } from './InternalNav';
+import { NotificationBell } from './NotificationBell';
 
 export interface InternalLayoutProps {
   /** Breadcrumb trail, most general first. */
@@ -41,11 +41,7 @@ export function InternalLayout({ breadcrumb = [], title, actions, children }: In
 
           <div className="flex items-center gap-sm">
             {actions}
-            <IconButton label="Notifications">
-              <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <path d="M18 9a6 6 0 10-12 0c0 5-2 6-2 6h16s-2-1-2-6M13.7 20a2 2 0 01-3.4 0" strokeLinecap="round" />
-              </svg>
-            </IconButton>
+            <NotificationBell />
           </div>
         </header>
 
