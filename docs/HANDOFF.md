@@ -2,7 +2,7 @@
 
 Written for the next coding agent picking this repository up. It records what is
 true in the working tree today, not what is planned. Where something is missing
-or half-built it says so plainly.
+or deliberately not built it says so plainly.
 
 **Read these three files before writing any code. They are not optional.**
 
@@ -35,12 +35,15 @@ Verified against the manifests in the tree today:
 | Frontend | React + TypeScript + Vite + Tailwind | React 18, Vite 6, Tailwind 3, react-router-dom 6 |
 | Backend | Node + Express + TypeScript, REST | Express 4.21, zod 3.24 |
 | Database | PostgreSQL + Prisma ORM | Prisma 6.3, Postgres 16 (Docker) |
+| Reporting export | pdfkit 0.16, xlsx 0.18 | backend dependencies |
 | Monorepo | npm workspaces | `shared`, `backend`, `frontend` |
 | Tests | Vitest | 3.x, backend only |
 | Browser verification | Playwright | 1.63, root devDependency |
 
-`socket.io` is installed in `backend/package.json` but **no socket code exists**
-(see §4). Treat the stack as REST-only today.
+**The app is REST-only.** There is no socket layer and no socket dependency:
+`socket.io` / `socket.io-client` were removed from the manifests, and the four
+socket scaffolds (`backend/src/sockets/*`, `frontend/src/lib/socket-client.ts`,
+`shared/types/socket-events.ts`) were deleted. See §4.
 
 ---
 
@@ -48,198 +51,211 @@ Verified against the manifests in the tree today:
 
 ```
 dealflow360/
-├── CLAUDE.md            rules — read first
-├── specs.md             product requirements + data model
-├── DESIGN.md            visual system
-├── README.md            EMPTY (0 bytes)
-├── docker-compose.yml   Postgres 16 only, host port 5433
-├── docs/                this file (the only file here)
-├── shared/              @dealflow360/shared — types crossing FE/BE
+├── shared/          # @dealflow360/shared — types shared by FE and BE
+│   ├── index.ts     # barrel: 17 type modules
+│   ├── types/
+│   └── dist/        # CommonJS build — MUST be rebuilt after a type edit
 ├── backend/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   ├── migrations/20260905084248_init/   (one migration, that is all)
-│   │   └── seed.ts
+│   ├── prisma/      # schema.prisma, one migration, seed.ts
 │   ├── src/
-│   │   ├── app.ts       Express wiring; every module mounted here
-│   │   ├── server.ts    listen only
-│   │   ├── config/env.ts   the ONLY place process.env is read
-│   │   ├── lib/         errors, async-handler, jwt, password, prisma-client
-│   │   ├── middleware/  auth, portal-auth, rbac, validate, error-handler
-│   │   ├── shared/audit/audit.service.ts
-│   │   └── modules/<name>/
-│   └── tests/
-└── frontend/src/
-    ├── App.tsx          all internal routes
-    ├── components/ui/   the primitive set — reuse these
-    ├── components/layout/  InternalLayout, InternalNav, PortalLayout
-    ├── features/<domain>/   *.api.ts + use*.ts hooks
-    ├── pages/internal/<domain>/  list + detail pairs
-    ├── pages/portal/    the separate customer surface
-    ├── lib/             api-client.ts, format.ts
-    └── routes/          access.ts (role lists), guards.tsx
+│   │   ├── app.ts, server.ts
+│   │   ├── config/env.ts        # the only place process.env is read
+│   │   ├── lib/                 # errors, prisma-client, async-handler
+│   │   ├── middleware/          # auth, portal-auth, rbac, validate, error-handler
+│   │   ├── modules/             # 21 modules
+│   │   └── shared/audit/        # audit.service.ts
+│   └── tests/       # fulfillment-split, subscription-proration, negotiation
+├── frontend/
+│   └── src/
+│       ├── components/layout/   # InternalLayout, InternalNav, NotificationBell,
+│       │                        # PortalLayout, PortalNav
+│       ├── components/ui/       # the design-system kit (Card, Table, Badge, …)
+│       ├── context/             # AuthContext, PortalAuthContext
+│       ├── features/<domain>/   # api + hooks per domain (17 domains)
+│       ├── lib/                 # api-client, format
+│       ├── pages/internal/…     # list + detail pairs
+│       ├── pages/portal/…       # the customer surface
+│       └── routes/              # access.ts, guards.tsx, portal-routes.tsx
+└── docs/            # this file (architecture diagram + next-steps still to write)
 ```
+
+There is no `frontend/src/components/shared/` directory — those seven files were
+empty stubs and were deleted. The kit lives in `components/ui/`.
 
 ### Backend module shape
 
-Every module in `backend/src/modules/<name>/` follows one shape:
+Each module under `backend/src/modules/<name>/` is:
 
 ```
-<name>.controller.ts   HTTP only: read parsed request, call service, respond
-<name>.service.ts      business logic + Prisma
-<name>.routes.ts       routes, with guards applied here
-<name>.schemas.ts      zod schemas (most modules)
+<name>.controller.ts   # HTTP only: read parsed request, call service, respond
+<name>.service.ts      # business logic + Prisma
+<name>.routes.ts       # routes, guards applied here
+<name>.schemas.ts      # zod schemas for params / query / body
 ```
 
-Controllers are thin. **No Prisma and no business logic in a controller.**
-
-Guards are **path-scoped**, never bare. This pattern is load-bearing — a bare
-`router.use(auth)` would leak onto other modules' routes:
-
-```ts
-reportingRoutes.use('/reports', auth, requireRole('SALES_MANAGER', 'FINANCE', 'ADMIN'));
-```
+Guards are **path-scoped** — `routes.use('/alerts', auth, seesTheBoard)` — never
+a bare `router.use(auth)`, which would leak onto every other module's routes
+mounted after it.
 
 ### Frontend shape
 
-Each domain is a **list + detail pair** under `pages/internal/<domain>/`, with
-its API calls and hooks in `features/<domain>/`. Screens hold layout; hooks hold
-state and fetching.
+Every internal module is a **list + detail pair**; a row click opens the detail.
+Domain API calls and hooks live in `frontend/src/features/<domain>/`. Screens
+never call `fetch` directly and never hold business logic.
 
 ### The three pure engines — do not put I/O in these
 
-These files contain algorithms only. **No Prisma, no Express, no I/O.** Plain
-objects in, plain objects out. They are what proves correctness to judges, and
-they are the reason the logic is not duplicated anywhere else.
+CLAUDE.md rule 1. Plain objects in, plain objects out. No Prisma, no Express, no
+`Date.now()`.
 
-| File | What it computes |
+| File | What it decides |
 |---|---|
-| `backend/src/modules/discount-engine/discount-engine.service.ts` | Blended risk score (specs §3), per-line ceiling/overage, required approval chain |
-| `backend/src/modules/fulfillment/split-allocator.ts` | Multi-warehouse split and backorder allocation |
-| `backend/src/modules/subscriptions/proration.ts` | Subscription proration on upgrade/downgrade/cancel |
+| `backend/src/modules/discount-engine/discount-engine.service.ts` | Per-line overage, the blended risk score (0.6 × worst single + 0.4 × total), the risk level, and the required approval chain |
+| `backend/src/modules/fulfillment/split-allocator.ts` | Which warehouses fill a line, in what quantities, and what backorders |
+| `backend/src/modules/subscriptions/proration.ts` | Mid-cycle proration on a plan change |
 
-Services call them. They call nothing. If you need a ceiling looked up, the
-**caller** resolves it and passes it in — see `loadCeilings()` in
-`quotations.service.ts` for the pattern.
+Callers resolve the inputs and pass them in — the engines look nothing up. When
+you need what an engine knows, **call it**; never re-implement its arithmetic.
+`discount-tiers.service.ts` is the worked example: it discovers the live risk
+bands by running `computeDiscountRisk` with probe inputs rather than copying its
+constants.
 
 ---
 
 ## 3. What is built — module checklist
 
-Status is judged from the code, not intent. "Scaffold" means the file exists but
-its whole content is `export {};`.
+Status is judged from the code, not intent.
 
 | Module | Backend | Frontend | specs §6 screens |
 |---|---|---|---|
-| Auth (internal) | Complete — `POST /auth/login`, `GET /auth/me`, JWT | Complete — `Login.tsx` | 1 (internal half) |
-| RBAC / staff users | Complete — `/users` CRUD, `/roles`; **ADMIN only** | Complete — list, detail, create | — |
-| Quotations | Complete — list, detail, create, line add/edit/delete, submit, confirm | Complete — list grouped by stage, detail with live `OVER (+Npt)` badges | 3, 4 (partial — no upsell panel) |
-| Approvals | Complete — list, detail, approve / return / reject | Complete — incl. per-line "why flagged" breakdown from `risk_score_factor` | 5, 6 (partial — no audit-trail view) |
-| Fulfillment | Complete — split suggestion, accept, manual override, ship, backorder consolidation | Complete — list + detail | 7, 8 |
-| Warehouses / inventory | Complete — warehouse CRUD, stock receipts, corrections, reserved floor enforced | Complete — list, detail, stock modals, backorder consolidation | (supports 7, 8) |
-| Subscriptions | Complete — list, detail, change, cancel, generate-invoice | Complete — list + detail | 9, 10 (see gap below) |
-| Billing / invoices | Complete — list, detail, `POST /invoices/:id/pay`, `/orders/:id/billing` | Complete — list, detail with progress timeline, record payment | 12, 13 |
-| Customer portal | Complete — `/portal/quotations`, detail, negotiate, confirm; separate `portal-auth` | Complete — Overview, My Quotations, Negotiation, Messages, Profile | 11 |
-| Products / catalogue | Complete — CRUD, variants, categories, price lists | Complete — catalogue, detail, create | 16, 17 |
-| Customers | Complete — CRUD + contacts | Complete — book, detail, create | — |
-| Deal health | Complete — 3 detectors, idempotent `POST /alerts/scan`, acknowledge, escalate | Complete — alert board with type filter | 14 |
-| Reporting | Complete — `/reports/summary`, `/quotations`, `/discounts`, `/owners`, `/export?format=pdf` | Complete — filters, metric cards, discount analysis, breakdown, Export PDF | 15 (PDF only, no XLS) |
-| **Sales dashboard** | n/a | **Scaffold** — `pages/internal/Dashboard.tsx` is `export {};`, nav item disabled | **2 — NOT BUILT** |
-| **Discount tiers config** | **Scaffold** — whole `discount-tiers` module | **Scaffold** — `DiscountTiersConfig.tsx` | **18 — NOT BUILT** |
-| **Recommendations / upsell** | **Scaffold** — whole `recommendations` module | **Scaffold** — `UpsellPanel.tsx` | part of 4 — **NOT BUILT** |
-| **Integrations (ERP)** | **Scaffold** | none | bonus — not built |
-| Sockets | **Scaffold** — `sockets/index.ts`, `quotation.gateway.ts` | **Scaffold** — `lib/socket-client.ts`, `shared/types/socket-events.ts` | — |
+| Auth (internal) | `POST /auth/login`, `GET /auth/me`, JWT | `Login.tsx` | 1 (internal half) |
+| RBAC / staff users | `/users` CRUD, `/roles` — ADMIN only | list, detail, create | — |
+| Sales dashboard | reads existing endpoints | `pages/internal/Dashboard.tsx` | 2 |
+| Quotations | list, detail, create, line add/edit/delete, submit, confirm | list grouped by stage, detail with live `OVER (+Npt)` badges | 3, 4 |
+| Recommendations / upsell | `GET /quotations/:id/recommendations`, accepted line carries `sourceRecommendationId` | `components/UpsellPanel.tsx` on the quotation detail | part of 4 |
+| Approvals | list, detail, approve / return / reject | per-line "why flagged" breakdown from `risk_score_factor`, step timeline, audit trail | 5, 6 |
+| Audit trail | `GET /quotations/:id/audit` | `approvals/components/AuditTrail.tsx` | part of 6 |
+| Fulfillment | split suggestion, accept, manual override, ship, backorder consolidation | list + detail | 7, 8 |
+| Warehouses / inventory | warehouse CRUD, stock receipts, corrections, reserved floor enforced | list, detail, stock modals, backorder consolidation | supports 7, 8 |
+| Subscriptions | list, detail, change, cancel, generate-invoice; `GET /subscription-plans` | list + detail | 9, 10 |
+| Billing / invoices | list, detail, `POST /invoices/:id/pay`, `/orders/:id/billing` | list, detail with progress timeline, record payment | 12, 13 |
+| Customer portal | `/portal/quotations`, detail, negotiate, confirm; separate `portal-auth` | Overview, My Quotations, Negotiation, Messages, Profile | 11 |
+| Negotiation (internal side) | `GET /quotations/:id/negotiations`, `POST /negotiation-requests/:id/respond` | `quotations/components/NegotiationPanel.tsx` | part of 4 and 11 |
+| Products / catalogue | CRUD, variants, categories, price-list reads | catalogue, detail, create | 16, 17 |
+| Customers | CRUD + contacts | book, detail, create | — |
+| Deal health | 3 detectors, idempotent `POST /alerts/scan`, acknowledge, escalate | alert board with type filter | 14 |
+| Reporting | `/reports/summary`, `/quotations`, `/discounts`, `/owners`, `/export?format=pdf\|xlsx` | filters, metric cards, discount analysis, breakdown, export | 15 |
+| Discount tier config | `GET /discount-rules`, `PATCH /discount-rules/:id` — ADMIN | `products/DiscountTiersConfig.tsx` | 18 — **phase 1** |
+| Notification bell | none — composes `/approvals`, `/alerts`, `/quotations?status=` | `layout/NotificationBell.tsx` in the sticky header | — |
 
-Note: the `negotiation`, `portal-messages` and `portal-profile` backend modules
-are empty scaffolds, but **the features they name are built elsewhere** and work:
+**All 18 specs §6 screens have a working surface.** Screen 18 is phase 1: tier,
+category and global ceilings are editable; the approval-chain bands are shown
+read-only because they are engine constants, not rows (see §4).
 
-- negotiation lives in `portal.service.ts` (`POST /portal/quotations/:id/negotiate`)
+Two backend modules are still `export {};` — `portal-messages` and
+`portal-profile`. They are **not mounted**, and the features they name are built
+elsewhere and work:
+
 - portal Messages reads the negotiation history off the quotations the customer
   can already open — there is deliberately no separate messages endpoint
 - portal Profile reads `GET /portal/auth/me` and is read-only by design
 
-Do not "fill in" those scaffolds without checking whether you would be building
-a second copy of something that already works.
+Do not "fill in" those two without checking whether you would be building a
+second copy of something that already works.
 
 ### specs §7 acceptance flow — 8 steps
 
 | # | Step | Status |
 |---|---|---|
-| 1 | Log in, set up a discount tier / warehouse / subscription plan | **Partial.** Login, warehouses and products work in the UI. Tiers and approval chains are seed-only — screen 18 does not exist, so there is no UI to create a tier. |
+| 1 | Log in, set up a discount tier / warehouse / subscription plan | **Passes**, with one honest limit. Login, warehouse CRUD and creating a recurring product all work in the UI, and screen 18 edits tier / category / global ceilings. Creating a brand-new `customer_tier` or `subscription_plan` **row** has no UI — only editing the seeded ones. |
 | 2 | Create a quotation with a discount higher than allowed | **Passes.** |
 | 3 | Confirm the quote automatically requests manager approval | **Passes.** Submit runs the engine and raises the chain; the rep never asks. |
-| 4 | Accept an upsell suggestion, total and margin update immediately | **Fails.** There is no upsell/recommendation feature. Totals and margin *do* recompute server-side on every line change, so the second half of the step holds. |
+| 4 | Accept an upsell suggestion, total and margin update immediately | **Passes.** `UpsellPanel` adds the line and the server recomputes and returns new totals, margin, ceiling and overage in the same response. |
 | 5 | Approve, then confirm stock splits across warehouses | **Passes.** |
 | 6 | One-time + recurring on one order billed separately | **Passes.** |
-| 7 | Portal counter-discount re-enters approval automatically | **Passes** at the API level and in the portal UI. See the testing gap in §4. |
+| 7 | Portal counter-discount re-enters approval automatically | **Passes**, both directions: the customer's portal confirm, and staff accepting the counter from the quotation (`NegotiationPanel`). Covered by `tests/negotiation.test.ts`. |
 | 8 | Confirm order, record payment, invoice status updates | **Passes.** |
 
-So **6 of 8 pass end to end**, step 1 partially, and step 4 is blocked on the
-missing upsell feature. If you have time for one feature, upsell is the one that
-buys back an acceptance step.
+The whole chain has been run end to end on a fresh seed with Playwright against
+the live stack.
 
 ---
 
-## 4. Known gaps and issues
+## 4. Known gaps, and what was deliberately not built
 
-Ordered by how much they cost.
+Nothing here is an accident — each line says whether it is unfinished work or a
+decision.
 
-1. **Upsell / product recommendations — not built.** The `ProductRecommendation`
-   table exists in the schema and `products.service.ts` counts rows against it
-   for delete-safety, but there is no endpoint and no UI. Blocks acceptance
-   step 4 and half of screen 4.
+1. **Approval-chain configuration (screen 18, phase 2) — deliberately not
+   built.** Ceilings are rows and are now editable. The bands that turn a
+   blended score into a chain are **constants inside the pure engine**
+   (`resolveApprovalChain`, and the high-risk threshold of `5.00`), not rows.
+   Making them configurable means changing what `computeDiscountRisk` takes as
+   input, which is an engine-logic change — CLAUDE.md says to ask first, and the
+   answer so far has been "phase 2, later". The screen shows the live bands
+   read-only, measured by running the engine, so it can never drift from what
+   actually routes a quotation.
 
-2. **Sales Dashboard (screen 2) — not built.** `pages/internal/Dashboard.tsx` is
-   an empty scaffold and the nav pill is rendered disabled. specs' internal nav
-   lists Dashboard first, so this is the most visible hole in the demo.
+2. **Dead tables kept in the schema, not dropped.** These models exist and are
+   read by nothing. Dropping them is a migration, and a migration is a decision
+   nobody has asked for — so they stay, documented rather than quietly removed:
 
-3. **Discount Tiers & Approval Chains (screen 18) — not built.** Tiers,
-   category ceilings and approval-chain rules can only be changed by editing the
-   seed. The whole `discount-tiers` backend module is a scaffold.
+   | Model | State |
+   |---|---|
+   | `ApprovalChainRule` | Seeded with 3 rows, read by no code. Its seeded bands (1.00–15.00 / 15.01+) also **disagree** with the engine's live threshold of 5.00 — do not trust them. |
+   | `PortalRole` | Seeded with one row and assigned to every contact, but no code reads a permission off it. Portal access is decided by `portal-auth` alone. |
+   | `RolePermission` | Never created — the seed only wipes it. Internal authorisation is `requireRole(...)` against role codes. |
+   | `ReportView` | Never touched anywhere. |
+   | `ErpIntegration` | Never touched. The `integrations` module stub that named it was deleted. |
+   | `PaymentGatewayTransaction` | Never touched. Payments are recorded directly on `payment`. |
 
-4. **`backend/tests/negotiation.test.ts` is an empty file**, and
-   `backend/vitest.config.ts` deliberately excludes it. CLAUDE.md's testing bar
-   names it as required: *"a counter-discount that pushes terms past threshold
-   re-enters approval"*. The behaviour is implemented and has been verified
-   manually through the API, but it has no unit test. `tests/discount-engine.test.ts`
-   is also empty — the real one lives at
-   `src/modules/discount-engine/discount-engine.test.ts`.
+3. **`PriceList` / `PriceListItem` — read-only, and empty.** The product detail
+   reads price-list entries and the delete guard counts them, but there is no
+   CRUD and **the seed creates none**, so the section is always empty in a fresh
+   database. specs screen 17 asks for tier/currency price lists.
 
-5. **Audit-trail UI — not built.** `audit_log` is written by twelve services and
-   is correct, but nothing renders it. Screen 6 asks for an audit trail on the
-   approval detail; today that screen only says decisions are recorded.
-   `pages/internal/approvals/components/AuditTrail.tsx` is an empty scaffold.
+4. **Sockets — removed, on purpose.** CLAUDE.md rule 6 describes an optional
+   socket layer over REST. It was never implemented, so the empty scaffolds and
+   both dependencies were deleted rather than left looking like a feature.
+   Screen 4's "checked live as it is typed" is satisfied by a REST round-trip
+   per line edit — the server recomputes and returns the new ceiling and
+   overage. If you add sockets, they layer **on top of** REST and never replace
+   an endpoint.
 
-6. **XLS export — not built.** specs screen 15 says "Export PDF / XLS". Only PDF
-   exists. `GET /reports/export?format=xls` deliberately returns **400** rather
-   than handing back a PDF under an XLS name.
+5. **Signup — not built, by design.** specs screen 1 says "Login / Signup".
+   Staff accounts are created by an admin on `/users`; portal contacts are
+   created on the customer record. There is no self-service signup and no SSO,
+   and CLAUDE.md forbids auth bypasses — do not add one to fill the gap.
 
-7. **Malformed JSON returns 500 instead of 400.** `error-handler.ts` only
-   special-cases `AppError`; body-parser's `entity.parse.failed` (which already
-   carries `statusCode: 400`) falls through to the generic 500 branch.
-   Reproduce: `curl -X POST localhost:4000/auth/login -H 'content-type: application/json' -d '{"bad json'`.
-   Fix is a few lines in the error handler.
+6. **Graded docs still missing.** CLAUDE.md lists an architecture diagram and a
+   next-steps note under `docs/` as deliverables. Only this handoff exists.
+   `README.md` is still a **0-byte file**. This is the cheapest remaining win.
 
-8. **No sockets.** CLAUDE.md rule 6 describes a socket layer for live margin
-   recalculation, approval status pushes and new deal-health alerts. None of it
-   exists: `sockets/index.ts`, `quotation.gateway.ts`, `lib/socket-client.ts`
-   and `shared/types/socket-events.ts` are all empty scaffolds. Screen 4's
-   "checked live as it is typed" is satisfied by a REST round-trip per line
-   edit (the server recomputes and returns the new ceiling/overage), not by a
-   keystroke-level preview. If you add sockets, they layer **on top of** REST —
-   they never replace an endpoint.
+7. **No frontend tests.** CLAUDE.md says frontend tests are out of scope for
+   this hackathon. Do not add them. Frontend behaviour is verified with
+   Playwright against the running stack (§9).
 
-9. **`docs/` was empty until this file.** CLAUDE.md lists an architecture
-   diagram and a next-steps note as graded deliverables. Both are still missing.
+8. **Commit `bbee2ed` has a malformed subject** — `@ feat: customer book and
+   staff directory screens`. A stray `@` from a PowerShell here-string used in a
+   bash context. History only; harmless.
 
-10. **`README.md` is a 0-byte file.**
+### What cleanup removed (do not go looking for these)
 
-11. **Commit `bbee2ed` has a malformed subject** — `@ feat: customer book and
-    staff directory screens`. A stray `@` from a PowerShell here-string used in
-    a bash context. History only; harmless.
+An earlier pass deleted every file whose entire content was `export {};`. If a
+past note or comment refers to one of these as "a scaffold", the note is stale:
 
-12. **Uncommitted work in the tree.** `backend/prisma/seed.ts` is modified and
-    not yet committed (see §10).
+- `backend/src/config/constants.ts`, `discount-engine.types.ts`,
+  `src/seed/seed.ts`, `shared/audit/audit.middleware.ts`
+- `backend/tests/discount-engine.test.ts` (the real one lives at
+  `src/modules/discount-engine/discount-engine.test.ts`)
+- `backend/src/modules/integrations/*` — the whole module
+- `backend/src/sockets/*`, `frontend/src/lib/socket-client.ts`,
+  `shared/types/socket-events.ts`, and both socket dependencies
+- `frontend/src/components/shared/*` — seven stub components
+- six stub hooks: `useApprovals`, `useFulfillment`, `useInvoices`,
+  `useProducts`, `useQuotations`, `useSubscriptions`
+- `frontend/src/routes/internal-routes.tsx` — routes live in `App.tsx`
+- four stub page components that had been superseded by real ones
 
 ---
 
@@ -274,20 +290,25 @@ the UI alone.
 
 | Area | SALES_REP | SALES_MANAGER | FINANCE | ADMIN |
 |---|---|---|---|---|
-| Quotations, fulfillment, products, customers, warehouses (read) | ✓ | ✓ | ✓ | ✓ |
+| Dashboard, quotations, fulfillment, products, customers, warehouses (read) | ✓ | ✓ | ✓ | ✓ |
 | Customer write | ✓ | — | — | ✓ |
-| Approvals (screens 5–6) | — | ✓ | ✓ | ✓ |
+| Approvals (screens 5–6) — read the desk | — | ✓ | ✓ | ✓ |
+| Approvals — decide a step | — | ✓ | ✓ | — |
+| Answer a negotiation request | ✓ | ✓ | — | ✓ |
 | Subscriptions, invoices | — | — | ✓ | ✓ |
 | Inventory movements (receipts, corrections) | — | — | ✓ | ✓ |
 | Deal health — read the board | — | ✓ | ✓ | ✓ |
 | Deal health — scan / acknowledge / escalate | — | ✓ | — | ✓ |
 | Reports — read and export | — | ✓ | ✓ | ✓ |
+| Discount ceilings — read | ✓ | ✓ | ✓ | ✓ |
+| Discount ceilings — change | — | — | — | ✓ |
 | Staff users / roles | — | — | — | ✓ |
 
 ### Seed logins
 
-Every seeded account shares the password **`dealflow360`** (hashed with bcrypt in
-the seed exactly as a real one would be, so login runs the identical comparison).
+Every seeded account — staff and portal — shares the password **`dealflow360`**
+(hashed with bcrypt in the seed exactly as a real one would be, so login runs the
+identical comparison).
 
 **Internal** — `http://localhost:5173/login`
 
@@ -306,7 +327,7 @@ the seed exactly as a real one would be, so login runs the identical comparison)
 | `gita@globex.test` | Gita Rao | Globex Industries | Silver |
 | `ishan@initech.test` | Ishan Mehta | Initech | Bronze |
 
-Two portal contacts on different customers is what lets you prove scoping: log in
+Three portal contacts on three customers is what lets you prove scoping: log in
 as Gita, try to open one of Aarti's quotations by id, expect 404.
 
 ---
@@ -339,55 +360,63 @@ believing you seeded it. Always use `npm run seed`.
 There is exactly **one migration**, `20260905084248_init`. CLAUDE.md says to ask
 before any schema change; a second migration is a real decision, not a detail.
 
+The seed wipes in FK-safe order before writing, and the wipe list covers every
+table the app writes — so a reseed leaves no stray alert, negotiation request,
+approval step, invoice, payment or audit row behind. A fresh seed is a true
+baseline, not a merge.
+
 ### What the seed contains
 
-- 3 customer tiers: Bronze 10%, Silver 12%, Gold 15%
-- 2 categories: Hardware (ceiling 15%), Services (ceiling 10%)
-- 6 discount rules: one per tier, one per category, plus a 5% global backstop
-- 4 staff users, 4 roles, 3 approval-chain rules
-- 4 products (one with a variant), 3 subscription plans
-- 3 customers with one portal contact each
-- 2 warehouses (WH-Mumbai, WH-Delhi) with stock shaped so an order of 10 laptops
-  must split across both, and warranty stock low enough to force a backorder
-- 8 quotations and 1 sales order
+Row counts printed by `npm run seed`:
 
-| Quotation | Customer | Purpose |
-|---|---|---|
-| **Q-2026-0001** | Acme (Gold) | **The specs §3 worked example — the risk fixture.** 3 lines; the Services line at 18% breaks its own 10% ceiling by 8 points, giving blended score **8.00 / HIGH**. Do not change this quote's numbers. |
-| Q-2026-0002 | Acme | Hybrid billing: one one-time line + one recurring line, both at list price |
-| Q-2026-0003 | Globex (Silver) | Deal health STALLED_DEAL — `lastActivityAt` backdated 30 days, still DRAFT |
-| Q-2026-0004/5/6 | Initech (Bronze) | Ordinary 8% quotes, giving the rep a discount average |
-| Q-2026-0007 | Initech (Bronze) | Deal health DISCOUNT_ANOMALY — 40% against that average; 30 points over the Bronze ceiling, blended **30.00 / HIGH** |
-| Q-2026-0008 + SO-2026-0001 | Acme | Deal health DELIVERY_SLIPPAGE — confirmed order, one reserved shipment promised 10 days ago and unshipped |
+| | |
+|---|---|
+| Customer tiers | 3 — Bronze 10%, Silver 12%, Gold 15% |
+| Categories | 2 — Hardware, Services |
+| Discount rules | 6 — one per tier (10 / 12 / 15), Hardware 15, Services 10, global backstop 5 |
+| Roles / users / user-roles | 4 / 4 / 4 |
+| Approval chain rules | 3 — **seeded but read by nothing** (§4) |
+| Products / variants / subscription plans | 4 / 1 / 3 |
+| Customers / contacts | 3 / 3 — Acme (Gold), Globex (Silver), Initech (Bronze) |
+| Warehouses / inventory stock | 2 / 4 — WH-MUMBAI, WH-DELHI |
+| Quotations / lines | 8 / 11 — Q-2026-0001…0007 DRAFT, Q-2026-0008 CONFIRMED |
+| Sales orders / fulfillments | 1 / 1 — the delivery-slippage fixture |
+| Risk score factors | 11 |
+| Lines over ceiling | 2 |
 
-A scan on a fresh seed opens **exactly three alerts**, one of each type.
+Every tier's `customer_tier.ceiling_pct` matches its `discount_rule.ceiling_pct`
+— the two are kept identical on purpose (§8).
+
+**Q-2026-0001 is the `specs.md` §3 worked example and a load-bearing fixture.**
+Acme (Gold), three lines:
+
+| Line | Discount | Applicable ceiling | Overage |
+|---|---|---|---|
+| Laptop Pro 14 (Hardware) | 12% | 15% | 0 |
+| Onsite Setup Service (Services) | 18% | 10% | **8** |
+| Extended Warranty (Hardware) | 10% | 15% | 0 |
+
+Blended score **8.00**, risk **HIGH**, max single overage 8, total overage 8.
+If a change moves those numbers, the change is wrong — check before you touch it.
+
+Two more fixtures are deliberately shaped: one quotation is 30 days idle so the
+stalled-deal detector fires, and the one sales order has a past promised date so
+delivery slippage fires. `POST /alerts/scan` opens three alerts on a fresh seed.
 
 ### The discount snapshot pass
 
-Rows are written straight into the tables, so nothing would have run the discount
-engine over them — every line would carry a zero ceiling and a zero overage, and
-reporting would show no over-limit lines while the data plainly held some.
+The seed writes quotation lines through a plain `createMany`, which does not fill
+`applicable_ceiling_pct`, `overage_pct` or the `risk_score_factor` rows the
+approval screens read. So after the main transaction the seed **replays the
+app's own `recomputeQuotation`** over the seeded quotations rather than
+duplicating the engine's arithmetic.
 
-So `main()` ends with a pass that hands each seeded quotation to
-**`recomputeQuotation()`** — the same function the API runs after every edit. The
-maths is not written a second time in the seed. It fills per-line ceiling and
-overage, blended score, risk level, the approval flag and the `risk_score_factor`
-rows, and **nothing else**: no status changes, no quote is auto-submitted, no
-approval step is raised.
+Two things to know if you edit it:
 
-Two things to know if you touch it:
-
-- It runs **after** the seed transaction. The wipe and the inserts already fill
-  that transaction and Prisma's interactive transactions time out at five seconds.
-- `recomputeQuotation()` stamps `lastActivityAt`, which is correct for a real
-  edit but would un-stall the 30-day-idle deal-health fixture. Each quotation's
-  `lastActivityAt` is captured before and restored after. Keep that guard.
-
-The seed is **idempotent**: every run wipes the seeded tables and reinserts, so
-running it twice leaves the same rows and the same numbers.
-
-**Before reseeding, ask.** Someone may have a dev server up with state they care
-about, and the wipe takes the whole database.
+- it runs **after** the transaction, because Prisma interactive transactions time
+  out at 5 seconds and the pass is slower than that;
+- `recomputeQuotation` stamps `lastActivityAt`, which would un-stall the
+  deal-health fixture — so the seed restores the original value afterwards.
 
 ---
 
@@ -425,8 +454,7 @@ npm run dev
 
 `frontend/.env`: `VITE_API_URL` (defaults to `http://localhost:4000`).
 
-**Do not touch `.env` files or the empty scaffolds under `backend/tests/`**
-unless you are actually implementing the test that belongs there.
+**Do not touch `.env` files** unless you are asked to.
 
 ### Ports and useful commands
 
@@ -442,7 +470,7 @@ unless you are actually implementing the test that belongs there.
 npm run dev                        # both servers, colour-tagged
 npm run typecheck                  # shared + backend + frontend
 npm run build                      # all three
-npm test -w backend                # vitest, 16 tests
+npm test -w backend                # vitest — 24 tests, 4 files
 npm run build -w @dealflow360/shared   # AFTER any shared/ type edit — see below
 ```
 
@@ -451,10 +479,12 @@ do not rebuild it, the backend typechecks against the stale build and you will
 chase a phantom error. Rebuild it, then typecheck.
 
 A related trap: shared enums are real TypeScript `enum`s, but Prisma's are string
-unions, and the Vite build cannot import enum *values* out of the CommonJS
-package. The established idiom is to cast literals at the edge —
-`'STALLED_DEAL' as AlertType` in the frontend, `row.type as AlertTypeView` in a
-backend view mapper. Follow it rather than inventing a third approach.
+unions, and the Vite dev server **cannot import enum values** out of the
+CommonJS package — doing so blanks the whole app with
+`does not provide an export named '…'`. The established idiom is to import the
+enum as a *type* and cast literals at the edge — `'NEGOTIATION' as QuotationStatus`
+in the frontend, `row.type as AlertTypeView` in a backend view mapper. Follow it
+rather than inventing a third approach.
 
 ---
 
@@ -465,115 +495,104 @@ Most of these are in CLAUDE.md; this is the working summary.
 **API shape.** Every endpoint answers `{ data, error }` — `data` on success,
 `error` on failure, never both. Lists add `meta`: `{ data: [], meta: { total } }`.
 The single exception is `GET /reports/export`, which answers with a file and sets
-`Content-Type: application/pdf` plus an attachment `Content-Disposition`.
+`Content-Type` plus an attachment `Content-Disposition` (which is CORS-exposed in
+`app.ts` — it is not a safelisted response header, and without that the browser
+saves the file under the wrong name).
 
 **Naming.** `camelCase` in TypeScript, `snake_case` in the database, Prisma
-`@map` between them. Never write snake_case in TS or camelCase in a migration.
+`@map` between them. Never write a raw snake_case field in application code.
 
-**Money is `Decimal`, never `Float`.** It serialises to JSON as a **string** —
-keep it a string across the wire and format it for display in `lib/format.ts`
-only. Never parse money into a float to render it.
+**Money is `Decimal`, never `Float`.** It serialises to JSON as a **string**;
+compare with `Number(...)` or `.toFixed(2)`, not with `===` against a literal.
+Formatting for display belongs in `frontend/src/lib/format.ts` and nowhere else.
 
-**Percentages are decimal percent**, not fractions: `12.5` means 12.5%.
+**Percentages are decimal percent** — `12.5` means 12.5%, not 0.125.
 
-**Enums** are declared in `shared/types/` and mirrored as Prisma enums. No loose
-strings.
+**Enums are declared once** in `shared/types/` and mirrored as Prisma enums.
+No loose status strings.
 
-**Shared types are shared.** Anything crossing the FE/BE boundary belongs in
-`shared/types/`. Never redefine a `Quotation` or `RiskScore` shape in the
-frontend.
+**Errors.** Throw the typed errors from `lib/errors.ts`
+(`NotFoundError`, `ValidationError`, `ConflictError`, `UnauthorizedError`,
+`ForbiddenError`); `middleware/error-handler.ts` turns them into responses. It
+also maps body-parser's own failures — a malformed JSON body is 400, not 500 —
+while anything unrecognised still gets the generic 500.
 
-**Errors** are thrown as typed errors from `lib/errors.ts` (`NotFoundError`,
-`ValidationError`, `ConflictError`, `UnauthorizedError`, `ForbiddenError`);
-`error-handler.ts` converts them to responses.
+**Thin controllers.** Parse, delegate, respond. No Prisma and no business logic
+in a controller, and none in a React component.
 
-**Everything auditable is audited.** Approvals, rejections, returns, discount
-edits, manual fulfillment overrides, stock movements, deal-health actions — all
-write to `audit_log` via `shared/audit/audit.service.ts` with user, timestamp and
-reason. Prisma wants `Prisma.InputJsonValue` for the `changes` column; the idiom
-in this codebase is `JSON.parse(JSON.stringify(x)) as Prisma.InputJsonValue`.
+**Every mutation that matters writes `audit_log`** via
+`shared/audit/audit.service.ts`, with the acting user, a reason and a
+before/after `changes` map. Fourteen services write it today. Approvals,
+rejections, returns, discount edits, ceiling changes, negotiation answers and
+manual fulfillment overrides are all on the record.
 
-**REST first.** All mutations go through REST. Sockets, if they ever land, are a
-layer on top and never replace an endpoint.
+**REST only.** Every mutation goes through a REST endpoint.
 
-**Reuse the engines.** If you find yourself computing an overage, a split or a
-proration, stop — one of the three pure engines already does it. Duplicated
-business maths is the single worst thing you can add to this repo.
+**Reuse the engines.** Never duplicate or modify engine arithmetic to make a
+caller easier. If you need what an engine knows, call it.
 
-**Never hardcode a demo result.** No faked split results, no stubbed billing
-schedules, no "demo mode" flags, no seeded admin backdoors, no auth bypasses.
-
-**Do not expand scope.** No multi-currency, no multi-company, no new frameworks
-or state libraries, no Dockerfiles for the app. Prefer the standard library and
-what is already installed over a new dependency.
-
-**Ask, do not guess**, on: schema changes, anything touching the blended risk
-score, and anything that moves the portal/internal auth boundary. Those three are
-expensive to unwind.
+**Nothing hardcoded.** No result faked to make a demo pass, no seeded backdoor,
+no "demo mode" flag.
 
 ### Testing bar
 
-`npm test -w backend` — **16 tests, all green today.** Frontend tests are
-explicitly out of scope; do not add them.
+`npm test -w backend` — **24 tests across 4 files**:
 
-| File | Covers |
-|---|---|
-| `src/modules/discount-engine/discount-engine.test.ts` | 3 tests — the specs §3 worked example, plus a "many small overages" case proving the blended score is not just max-of-line |
-| `tests/fulfillment-split.test.ts` | 6 tests — split across two warehouses, and a backorder case |
-| `tests/subscription-proration.test.ts` | 7 tests — upgrade, downgrade, cancellation |
-| `tests/negotiation.test.ts` | **empty, and excluded in `vitest.config.ts`** — the required counter-discount-re-enters-approval test is still owed |
+| File | Tests | Covers |
+|---|---|---|
+| `src/modules/discount-engine/discount-engine.test.ts` | 3 | the `specs.md` worked example, and a "many small overages" case proving the blended score is not simply max-of-line |
+| `tests/fulfillment-split.test.ts` | 6 | a split across two warehouses, and a backorder case |
+| `tests/subscription-proration.test.ts` | 7 | mid-cycle plan changes |
+| `tests/negotiation.test.ts` | 8 | answering a counter: priced within the ceiling, a breach re-entering approval at Sales Manager + Finance, a small breach routing to the manager alone, rejection, a counter-less request, a concurrent-answer conflict, a quote past negotiation, and a missing request |
 
-When you fill a scaffolded test file, add it to the `include` list in
-`backend/vitest.config.ts` — the config lists only the scaffolds actually written.
+`tests/negotiation.test.ts` stands its database up in memory but drives the real
+`computeDiscountRisk` over real ceilings, so whether a counter breaches is the
+engine's own answer. If you add a service test, do the same — mocking the
+decision tests nothing.
+
+`backend/vitest.config.ts` lists test files explicitly. A new file under
+`backend/tests/` must be added to `include` or it will not run.
 
 ---
 
 ## 9. How work is verified here
 
-Two standards have been applied to every screen so far. Hold them.
+Unit tests cover the pure logic. Everything else is verified by **actually
+running it** — the API with `fetch` scripts, the UI with Playwright against the
+live dev stack. "It typechecks" is not verification.
 
 ### Browser verification with Playwright
 
-Playwright is a root devDependency and is driven **from CLI scripts, not a test
-suite** — there is no `playwright.config.ts` and no committed spec files. The
-established pattern:
+Playwright is a root devDependency. Verification scripts are written to a
+scratch directory and driven from the CLI — **they are never committed to the
+repository** (frontend tests are out of scope; these are throwaway proof runs).
 
-- Write the script in a scratch directory, **never in the repo**. No verification
-  script has ever been committed and none should be.
-- Import from the absolute path:
-  `import { chromium } from 'file:///.../node_modules/@playwright/test/index.mjs'`
-- Run it against the already-running dev stack (`:4000` API, `:5173` app).
-- Collect `console` errors and `pageerror` events and assert **zero** of each,
-  filtering known noise (`React DevTools`, `vite`, `[hmr]`).
-- Take full-page screenshots and actually look at them — several real design bugs
-  (all-blue tier badges, an invisible dark badge on a dark card, a mislabelled
-  notice) were only ever caught by reading a screenshot.
-- Assert against the API's own numbers rather than hardcoded values, so the
-  script survives a reseed.
+```js
+import { chromium } from 'file:///<repo>/node_modules/@playwright/test/index.mjs';
+```
 
-Gotchas already paid for: `selectOption({ label: /regex/ })` is unsupported; CSS
-`text-transform: uppercase` changes `innerText`; a `<select>` nested in a
-`<label>` absorbs its option text into the accessible name, so every select needs
-an explicit `aria-label`; browser contexts share `localStorage`; and a list
-re-reads after a filter click, so waiting for "the rows changed" hangs whenever a
-filter legitimately selects the same set — wait for the API response and then for
-the DOM to match it.
+Every run asserts **zero console errors and zero `pageerror` events** alongside
+its behavioural checks. That single assertion has caught real bugs that no
+typecheck would — including a blank-screen crash from importing a shared enum as
+a value.
+
+Prefer accessible selectors — `getByRole('table', { name: … })`,
+`getByLabel(…)` — and give tables an `aria-label` so they can be addressed.
 
 ### No empty or dead functionality
 
-This is the hard rule for any screen you build:
+The standard applied throughout, and the one to keep:
 
-- Every button does something real.
-- Every section shows either data or a written empty state — never a blank panel.
-- No placeholders, no "coming soon", no disabled controls standing in for a
-  feature.
-- **If the backend does not provide it, do not put it in the UI.** Building a
-  control with nothing behind it is worse than leaving it out.
-- Loading and error states are handled everywhere via the shared `LoadingCard`,
-  `ErrorCard` and `EmptyCard` primitives.
+- every button does something
+- every section shows real data or a real empty state
+- no placeholder text, no "coming soon", no disabled control standing in for a
+  feature
+- if the backend cannot supply it, it does not go in the UI at all
 
-When something genuinely cannot be built — no endpoint, a role that cannot read
-the data — say so in the report rather than shipping a dead control.
+When something genuinely cannot be built — no endpoint, or a role that cannot
+read the data — say so in the report rather than shipping a dead control. The
+approval-chains section on screen 18 is the model: it is read-only and says why,
+rather than offering an edit that would fail.
 
 ---
 
@@ -582,34 +601,23 @@ the data — say so in the report rather than shipping a dead control.
 | | |
 |---|---|
 | Branch | `main` |
-| Last commit | `506a5cb feat: admin reporting dashboard` |
+| Last commit | `9c5ab50 fix: complete seed wipe list for clean reseed` |
 | Remote | `https://github.com/amarnotcool/DealFlow360_trial.git` |
-| Working tree | **not clean** — one modified file (below) |
-
-```
- M backend/prisma/seed.ts
-```
-
-That change is the discount-snapshot pass described in §6 plus the Bronze (10%)
-and Silver (12%) tier discount rules. It has been verified — 57/57 snapshot
-checks, 124/124 reporting backend, 65/65 reporting UI, 28/28 deal health, 16 unit
-tests, typecheck and build clean, seed idempotent across three runs — but it was
-**not committed**, because the commit was never asked for. Commit it or discard
-it deliberately; do not let it drift.
+| Working tree | clean, and pushed |
 
 Recent history, newest first:
 
 ```
-506a5cb feat: admin reporting dashboard
-7bbf865 feat: admin reporting and the PDF export of it
-ff6995b feat: deal health dashboard screen
-3170d64 feat: deal health alerts and the promised dates they measure
-260fab4 feat: customer portal dashboard (Overview)
-21fbcea feat: warehouse, inventory and backorder consolidation screens
-11a96fe feat: stock receipts, corrections and backorder consolidation
-bbee2ed @ feat: customer book and staff directory screens
-ca232bf feat: customer book and staff user directory
-d0977ae feat: product catalogue screens and a real add-line picker
+9c5ab50 fix: complete seed wipe list for clean reseed
+b1d5735 chore: remove unused integrations module stub
+0ce76ef chore: remove unused socket scaffolding and dependencies (manifests)
+33c7dad chore: remove unused socket scaffolding and dependencies
+84ed029 chore: remove unused shared components and stub hooks
+58d368d chore: remove dead stub files
+73d7a1b test: negotiation response coverage
+e9f1a29 fix: malformed JSON returns 400
+80cdfba feat: discount tier/ceiling config (screen 18 phase 1)
+43fcbf4 feat: live notification bell
 ```
 
 ---
@@ -618,9 +626,11 @@ d0977ae feat: product catalogue screens and a real add-line picker
 
 1. Read `CLAUDE.md`, `specs.md`, `DESIGN.md`.
 2. Get it running (§7), log in as `manager@dealflow360.test`, and click through
-   Quotations → Approvals → Fulfillment → Reports to see the shape of the thing.
-3. Decide what to do with the uncommitted `seed.ts` change (§10).
-4. Then, in the order that buys the most: the upsell panel (unblocks acceptance
-   step 4), the Sales Dashboard (screen 2, the most visible hole), the
-   negotiation test (§4 item 4), and the malformed-JSON 400 fix (§4 item 7, a
-   few lines).
+   Dashboard → Quotations → Approvals → Fulfillment → Reports to see the shape of
+   the thing. Then log in as `admin@dealflow360.test` for screen 18.
+3. Then, in the order that buys the most:
+   - the graded `docs/` deliverables and a real `README.md` (§4 item 6) — the
+     cheapest points left on the table;
+   - price lists (§4 item 3) — screen 17 has a section that is always empty;
+   - approval-chain configuration (§4 item 1) — **ask before starting**, it
+     changes what the discount engine takes as input.
