@@ -206,11 +206,11 @@ const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync(SEED_PASSWORD, 10);
 
 async function main() {
   await prisma.$transaction(async (tx) => {
-    // Wipe in FK-safe order (children first). Order and fulfillment rows are
-    // written by the running app (POST /quotations/:id/confirm and the
-    // fulfillment module), so a reseed has to clear them too.
+    // Wipe in FK-safe order (children first). Order, fulfillment and negotiation
+    // rows are written by the running app, so a reseed has to clear them too.
     await tx.alert.deleteMany();
     await tx.auditLog.deleteMany();
+    await tx.negotiationRequest.deleteMany();
     await tx.payment.deleteMany();
     await tx.creditNote.deleteMany();
     await tx.invoiceLine.deleteMany();
