@@ -423,24 +423,32 @@ Two things to know if you edit it:
 ## 7. Running it from a clean clone
 
 ```bash
-# 1. install (workspaces resolve shared/ into both backend and frontend)
+# 1. install — workspaces resolve shared/ into both backend and frontend, and
+#    backend's postinstall hook generates the Prisma client for you
 npm install
 
-# 2. generate the Prisma client — there is NO postinstall hook in this repo
-npm run prisma:generate -w backend
-
-# 3. environment: copy both examples and fill them in
+# 2. environment: copy both examples and fill them in
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
-# 4. database
+# 3. database
 docker compose up -d
 npm run prisma:migrate -w backend
 npm run seed
 
-# 5. run both dev servers
+# 4. run both dev servers
 npm run dev
 ```
+
+`backend/package.json` carries `"postinstall": "prisma generate"`, so a root
+`npm install` generates `@prisma/client` on its own — no separate step after a
+clone or a pull. npm runs it with `backend/` as the working directory, so it
+finds `prisma/schema.prisma` and writes the client into the hoisted root
+`node_modules/@prisma/client`. Run `npm install --foreground-scripts` if you want
+to watch it happen.
+
+You still need `npm run prisma:generate -w backend` by hand after **editing
+`schema.prisma`**, since no install is running then.
 
 `backend/.env` — all five are read in `config/env.ts` and nowhere else:
 
