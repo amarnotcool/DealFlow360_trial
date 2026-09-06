@@ -4,14 +4,16 @@
 // Icons alone are quick once you know them and opaque until you do, so the rail
 // opens to show every label — two ways, which behave differently on purpose:
 //
-//   hover   the rail floats open OVER the page. Its footprint in the layout
-//           stays 72px, so nothing reflows while the pointer passes across it.
-//   pin     the rail keeps its width, and now takes that width in the layout,
-//           so the content beside it narrows once — a deliberate act, not a
-//           side effect of where the mouse went.
+//   hover   the rail opens while the pointer is on it, and closes when it
+//           leaves.
+//   pin     the rail stays open with the pointer anywhere, until it is unpinned.
 //
-// Both animate the same width, so pinning while hovered is seamless: the panel
-// is already open and only its footprint grows.
+// In BOTH states the rail keeps its real width in the layout, so the page
+// beside it moves over and narrows to match. It never floats above the content:
+// an overlay would cover the page title, the filter pills and the left edge of
+// every table — the reader would lose exactly the part of the screen they were
+// pointing at. Rail and content animate the same 200ms, so the shift reads as
+// one movement rather than two.
 
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -212,8 +214,9 @@ export function InternalNav() {
 
   const open = pinned || hovered;
 
-  // Hover floats the panel over the page; only a pin takes real layout width.
-  const footprint = pinned ? EXPANDED_PX : COLLAPSED_PX;
+  // The footprint follows the panel exactly — open or closed, hovered or
+  // pinned. That is what pushes the content across instead of covering it.
+  const width = open ? EXPANDED_PX : COLLAPSED_PX;
 
   // A role only sees the screens it can actually open; the same list guards the
   // routes, and the API refuses the endpoints behind them regardless.
@@ -224,7 +227,7 @@ export function InternalNav() {
   return (
     <div
       className="ml-lg shrink-0 transition-[width] duration-200 ease-out"
-      style={{ width: footprint }}
+      style={{ width }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -233,21 +236,16 @@ export function InternalNav() {
 
           The stacking order lives here, not on the <nav>: z-index only applies
           to a positioned element, and this wrapper is the positioned one. The
-          rail opens over the page, and page cards lift on hover with a
-          transform — which makes them their own stacking context — so without
-          this the open rail is painted under them and cannot be clicked. */}
+          rail no longer overlaps the page, but the action bar above it is
+          sticky too, and this keeps the rail's rounded edge in front of it. */}
       <div className="sticky top-lg z-40">
         <nav
           aria-label="Internal navigation"
           data-open={open ? "true" : "false"}
           className={cn(
-            "frost-rail flex flex-col gap-xs overflow-hidden rounded-xl px-md py-lg",
-            "h-[calc(100vh-3rem)] transition-[width,box-shadow] duration-200 ease-out",
-            // Open over content, it needs to read as a floating layer rather
-            // than as part of the page beneath it.
-            open && !pinned && "shadow-depth-obsidian",
+            "frost-rail flex w-full flex-col gap-xs overflow-hidden rounded-xl px-md py-lg",
+            "h-[calc(100vh-3rem)] transition-[width] duration-200 ease-out",
           )}
-          style={{ width: open ? EXPANDED_PX : COLLAPSED_PX }}
         >
           <div className="mb-sm flex h-10 w-full items-center gap-sm">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-obsidian text-label-xs text-lemon">
