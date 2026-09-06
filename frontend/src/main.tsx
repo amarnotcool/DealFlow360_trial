@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { NavProvider } from './context/NavContext';
 import { PortalAuthProvider } from './context/PortalAuthContext';
 import './index.css';
 
@@ -20,7 +21,9 @@ ReactDOM.createRoot(rootElement).render(
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <PortalAuthProvider>
-          <App />
+          <NavProvider>
+            <App />
+          </NavProvider>
         </PortalAuthProvider>
       </AuthProvider>
     </BrowserRouter>
