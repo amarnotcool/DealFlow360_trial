@@ -25,5 +25,12 @@ export const INVENTORY_ROLES: RoleCode[] = ['FINANCE', 'ADMIN'];
 /** Analytics is manager and admin work; finance reads the same money numbers. */
 export const REPORTING_ROLES: RoleCode[] = ['SALES_MANAGER', 'FINANCE', 'ADMIN'];
 
+/**
+ * Answering a customer's negotiation request is sales work (specs.md §2 gives
+ * it to the Sales Rep). Finance reads the thread but does not haggle over a
+ * discount, and the API refuses it the response either way.
+ */
+export const NEGOTIATION_RESPOND_ROLES: RoleCode[] = ['SALES_REP', 'SALES_MANAGER', 'ADMIN'];
+
 /** Finance watches the deal-health board; the sales manager and admin work it. */
 export const DEAL_HEALTH_WRITE_ROLES: RoleCode[] = ['SALES_MANAGER', 'ADMIN'];
