@@ -136,16 +136,16 @@ export default function UsersList() {
               onChange={(event) => setSearch(event.target.value)}
               className="w-[16rem] max-w-full"
             />
-            <FilterPill label="Role" value="All" active={role === ''} onClick={() => setRole('')} />
-            {roles.map((option) => (
-              <FilterPill
-                key={option.id}
-                label="Role"
-                value={option.name}
-                active={role === option.code}
-                onClick={() => setRole(option.code)}
-              />
-            ))}
+            <FilterPill
+              label="Role"
+              value={role}
+              neutralValue=""
+              options={[
+                { value: '', label: 'All' },
+                ...roles.map((option) => ({ value: option.code, label: option.name })),
+              ]}
+              onChange={setRole}
+            />
           </div>
         </TableToolbar>
 

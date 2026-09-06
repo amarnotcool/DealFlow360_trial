@@ -10,6 +10,8 @@ import {
   CardLabel,
   CardMetric,
   Checkbox,
+  FilterChip,
+  FilterChipGroup,
   FilterPill,
   IconButton,
   RiskBadge,
@@ -128,9 +130,24 @@ export default function Preview() {
       <Section title="Search and filter controls">
         <Card className="flex flex-wrap items-center gap-md">
           <SearchInput placeholder="Search quotations" className="w-[20rem] max-w-full" />
-          <FilterPill label="Stage" value="Pending Approval" active />
-          <FilterPill label="Owner" value="Riya" />
-          <FilterPill label="Period" value="This quarter" />
+          {/* One trigger per parameter, each opening its own values. */}
+          <FilterPill
+            label="Stage"
+            value="PENDING_APPROVAL"
+            neutralValue="ALL"
+            options={[
+              { value: 'ALL', label: 'All' },
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'PENDING_APPROVAL', label: 'Pending Approval' },
+              { value: 'APPROVED', label: 'Approved' },
+            ]}
+            onChange={() => {}}
+          />
+          {/* Chips for a short, mutually exclusive set worth seeing at a glance. */}
+          <FilterChipGroup label="Period">
+            <FilterChip active>This quarter</FilterChip>
+            <FilterChip>This year</FilterChip>
+          </FilterChipGroup>
         </Card>
       </Section>
 
@@ -142,7 +159,9 @@ export default function Preview() {
               <Badge variant="neutral">3 lines</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-sm">
-              <FilterPill label="Category" value="All" />
+              <FilterChip label="Category" active>
+                All
+              </FilterChip>
               <Button variant="secondary">Add line</Button>
             </div>
           </TableToolbar>

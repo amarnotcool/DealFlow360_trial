@@ -18,7 +18,8 @@ import {
   CardMetric,
   EmptyCard,
   ErrorCard,
-  FilterPill,
+  FilterChip,
+  FilterChipGroup,
   LoadingCard,
   RISK_BADGE_VARIANT,
 } from '../../../components/ui';
@@ -122,18 +123,23 @@ export default function DealHealthDashboard() {
       </div>
 
       <div className="mb-lg flex flex-wrap items-center justify-between gap-md">
-        <div className="flex flex-wrap items-center gap-xs">
-          <FilterPill label="Type" value="All" active={type === null} onClick={() => setType(null)} />
+        {/* Chips, not a dropdown: the count beside each type is the point, and
+            folding them into a menu would hide the numbers the board is for. */}
+        <FilterChipGroup label="Type">
+          <FilterChip active={type === null} onClick={() => setType(null)}>
+            All
+          </FilterChip>
           {TYPE_ORDER.map((option) => (
-            <FilterPill
+            <FilterChip
               key={option}
-              label="Type"
-              value={`${ALERT_TYPE[option].label} ${meta.byType[option]}`}
               active={type === option}
+              count={meta.byType[option]}
               onClick={() => setType(option)}
-            />
+            >
+              {ALERT_TYPE[option].label}
+            </FilterChip>
           ))}
-        </div>
+        </FilterChipGroup>
         <div className="flex flex-wrap items-center gap-xs">
           <Badge variant="neutral">{meta.byStatus.OPEN} open</Badge>
           <Badge variant="neutral">{meta.byStatus.ACKNOWLEDGED} acknowledged</Badge>

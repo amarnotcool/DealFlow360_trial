@@ -17,7 +17,7 @@ import {
   CardMetric,
   EmptyCard,
   ErrorCard,
-  FilterPill,
+  FilterChip,
   LoadingCard,
   Table,
   TableShell,
@@ -124,12 +124,13 @@ export default function WarehousesList() {
                 : 'Open a warehouse to see what it holds.'}
             </p>
           </div>
-          <FilterPill
+          <FilterChip
             label="Status"
-            value={includeInactive ? 'All' : 'Active'}
             active={includeInactive}
             onClick={() => setIncludeInactive((value) => !value)}
-          />
+          >
+            {includeInactive ? 'All' : 'Active'}
+          </FilterChip>
         </TableToolbar>
 
         {rows === null ? (

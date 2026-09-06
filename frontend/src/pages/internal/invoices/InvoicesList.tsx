@@ -15,7 +15,8 @@ import {
   CardMetric,
   EmptyCard,
   ErrorCard,
-  FilterPill,
+  FilterChip,
+  FilterChipGroup,
   LoadingCard,
   Table,
   TableShell,
@@ -103,17 +104,17 @@ export default function InvoicesList() {
               One-time invoices bill what shipped; recurring invoices bill a subscription period.
             </p>
           </div>
-          <div className="flex items-center gap-xs">
+          <FilterChipGroup label="Type">
             {TYPE_FILTERS.map((filter) => (
-              <FilterPill
+              <FilterChip
                 key={filter.label}
-                label="Type"
-                value={filter.label}
                 active={type === filter.value}
                 onClick={() => setType(filter.value)}
-              />
+              >
+                {filter.label}
+              </FilterChip>
             ))}
-          </div>
+          </FilterChipGroup>
         </TableToolbar>
 
         {rows === null ? (

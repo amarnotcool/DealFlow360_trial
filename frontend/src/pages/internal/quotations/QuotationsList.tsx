@@ -19,6 +19,7 @@ import {
   ErrorCard,
   FIELD_CLASS,
   FilterPill,
+  type FilterOption,
   LabelledField,
   LoadingCard,
   RiskBadge,
@@ -34,8 +35,8 @@ import { fetchCustomers } from '../../../features/customers/customers.api';
 import { createQuotation, fetchQuotations } from '../../../features/quotations/quotations.api';
 import { humanise, money, percent } from '../../../lib/format';
 
-/** The stages specs.md §6 groups the list by. */
-const STAGES: Array<{ label: string; value: QuotationStatus | 'ALL' }> = [
+/** The stages specs.md §6 groups the list by, as the Stage dropdown's options. */
+const STAGES: Array<FilterOption<QuotationStatus | 'ALL'>> = [
   { label: 'All', value: 'ALL' },
   { label: 'Draft', value: 'DRAFT' as QuotationStatus },
   { label: 'Pending Approval', value: 'PENDING_APPROVAL' as QuotationStatus },
@@ -162,17 +163,7 @@ export default function QuotationsList() {
 
       <TableShell className={error || picking ? 'mt-lg' : undefined}>
         <TableToolbar>
-          <div className="flex flex-wrap items-center gap-xs">
-            {STAGES.map((option) => (
-              <FilterPill
-                key={option.value}
-                label="Stage"
-                value={option.label}
-                active={stage === option.value}
-                onClick={() => setStage(option.value)}
-              />
-            ))}
-          </div>
+          <FilterPill label="Stage" value={stage} options={STAGES} neutralValue="ALL" onChange={setStage} />
           <div className="flex items-center gap-sm">
             <Badge variant="neutral">{total} total</Badge>
             <SearchInput

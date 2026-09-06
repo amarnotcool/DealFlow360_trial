@@ -16,6 +16,7 @@ import {
   CardMetric,
   EmptyCard,
   ErrorCard,
+  FilterChip,
   FilterPill,
   LoadingCard,
   SearchInput,
@@ -163,25 +164,21 @@ export default function CustomersList() {
             />
             <FilterPill
               label="Tier"
-              value="All"
-              active={customerTierId === ''}
-              onClick={() => setCustomerTierId('')}
+              value={customerTierId}
+              neutralValue=""
+              options={[
+                { value: '', label: 'All' },
+                ...tiers.map((tier) => ({ value: tier.id, label: tier.name })),
+              ]}
+              onChange={setCustomerTierId}
             />
-            {tiers.map((tier) => (
-              <FilterPill
-                key={tier.id}
-                label="Tier"
-                value={tier.name}
-                active={customerTierId === tier.id}
-                onClick={() => setCustomerTierId(tier.id)}
-              />
-            ))}
-            <FilterPill
+            <FilterChip
               label="Status"
-              value={includeInactive ? 'All' : 'Active'}
               active={includeInactive}
               onClick={() => setIncludeInactive((value) => !value)}
-            />
+            >
+              {includeInactive ? 'All' : 'Active'}
+            </FilterChip>
           </div>
         </TableToolbar>
 

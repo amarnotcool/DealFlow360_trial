@@ -17,7 +17,8 @@ import {
   CardMetric,
   EmptyCard,
   ErrorCard,
-  FilterPill,
+  FilterChip,
+  FilterChipGroup,
   LoadingCard,
   SearchInput,
   Table,
@@ -151,27 +152,27 @@ export default function ProductCatalog() {
               onChange={(event) => setSearch(event.target.value)}
               className="w-[16rem] max-w-full"
             />
-            <FilterPill
-              label="Category"
-              value="All"
-              active={categoryId === ''}
-              onClick={() => setCategoryId('')}
-            />
-            {categories.map((category) => (
-              <FilterPill
-                key={category.id}
-                label="Category"
-                value={category.name}
-                active={categoryId === category.id}
-                onClick={() => setCategoryId(category.id)}
-              />
-            ))}
-            <FilterPill
+            <FilterChipGroup label="Category">
+              <FilterChip active={categoryId === ''} onClick={() => setCategoryId('')}>
+                All
+              </FilterChip>
+              {categories.map((category) => (
+                <FilterChip
+                  key={category.id}
+                  active={categoryId === category.id}
+                  onClick={() => setCategoryId(category.id)}
+                >
+                  {category.name}
+                </FilterChip>
+              ))}
+            </FilterChipGroup>
+            <FilterChip
               label="Status"
-              value={includeInactive ? 'All' : 'Active'}
               active={includeInactive}
               onClick={() => setIncludeInactive((value) => !value)}
-            />
+            >
+              {includeInactive ? 'All' : 'Active'}
+            </FilterChip>
           </div>
         </TableToolbar>
 

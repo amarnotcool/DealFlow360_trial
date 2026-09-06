@@ -95,17 +95,13 @@ export default function SubscriptionsList() {
               Open one to bill its period, change its terms, or cancel it.
             </p>
           </div>
-          <div className="flex items-center gap-xs">
-            {STATUS_FILTERS.map((filter) => (
-              <FilterPill
-                key={filter.label}
-                label="Status"
-                value={filter.label}
-                active={status === filter.value}
-                onClick={() => setStatus(filter.value)}
-              />
-            ))}
-          </div>
+          <FilterPill
+            label="Status"
+            value={status}
+            neutralValue=""
+            options={STATUS_FILTERS.map((filter) => ({ value: filter.value, label: filter.label }))}
+            onChange={setStatus}
+          />
         </TableToolbar>
 
         {rows === null ? (
