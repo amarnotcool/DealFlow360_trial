@@ -13,8 +13,7 @@
     "@dealflow360/shared": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.1",
-    "socket.io-client": "^4.8.1"
+    "react-router-dom": "^6.28.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",

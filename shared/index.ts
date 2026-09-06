@@ -14,5 +14,4 @@ export * from './types/quotation';
 export * from './types/recommendation';
 export * from './types/reporting';
 export * from './types/risk-score';
-export * from './types/socket-events';
 export * from './types/subscription';
