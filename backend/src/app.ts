@@ -13,6 +13,7 @@ import { dealHealthRoutes } from './modules/deal-health/deal-health.routes';
 import { fulfillmentRoutes } from './modules/fulfillment/fulfillment.routes';
 import { healthRoutes } from './modules/health/health.routes';
 import { inventoryRoutes } from './modules/inventory/inventory.routes';
+import { negotiationRoutes } from './modules/negotiation/negotiation.routes';
 import { portalRoutes } from './modules/portal/portal.routes';
 import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
@@ -43,6 +44,7 @@ export function createApp() {
   app.use(inventoryRoutes);
   app.use(quotationsRoutes);
   app.use(recommendationsRoutes);
+  app.use(negotiationRoutes);
   app.use(approvalsRoutes);
   app.use(fulfillmentRoutes);
   app.use(dealHealthRoutes);
