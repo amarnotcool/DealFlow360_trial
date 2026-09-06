@@ -8,6 +8,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       'tests/fulfillment-split.test.ts',
+      'tests/negotiation.test.ts',
       'tests/subscription-proration.test.ts',
     ],
   },
