@@ -17,6 +17,7 @@ import { negotiationRoutes } from './modules/negotiation/negotiation.routes';
 import { portalRoutes } from './modules/portal/portal.routes';
 import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes';
 import { productsRoutes } from './modules/products/products.routes';
+import { discountTiersRoutes } from './modules/discount-tiers/discount-tiers.routes';
 import { quotationsRoutes } from './modules/quotations/quotations.routes';
 import { rbacRoutes } from './modules/rbac/rbac.routes';
 import { recommendationsRoutes } from './modules/recommendations/recommendations.routes';
@@ -38,6 +39,7 @@ export function createApp() {
   // itself so a route can never be mounted without one by accident.
   app.use(authRoutes);
   app.use(productsRoutes);
+  app.use(discountTiersRoutes);
   app.use(customersRoutes);
   app.use(rbacRoutes);
   app.use(warehousesRoutes);

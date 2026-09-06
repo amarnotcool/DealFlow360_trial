@@ -19,6 +19,13 @@ export const CUSTOMER_WRITE_ROLES: RoleCode[] = ['SALES_REP', 'ADMIN'];
 /** Who may sign in, and as what, is admin-only. */
 export const ADMIN_ONLY: RoleCode[] = ['ADMIN'];
 
+/**
+ * Discount ceilings are the policy every quotation is priced against, so
+ * changing one is admin work (specs.md screen 18). The API refuses the PATCH to
+ * anyone else regardless.
+ */
+export const DISCOUNT_CONFIG_ROLES: RoleCode[] = ['ADMIN'];
+
 /** Finance and Ops move stock; an admin keeps the same reach (specs.md §2). */
 export const INVENTORY_ROLES: RoleCode[] = ['FINANCE', 'ADMIN'];
 

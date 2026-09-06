@@ -17,6 +17,7 @@ import FulfillmentDetail from './pages/internal/fulfillment/FulfillmentDetail';
 import FulfillmentList from './pages/internal/fulfillment/FulfillmentList';
 import InvoiceDetail from './pages/internal/invoices/InvoiceDetail';
 import InvoicesList from './pages/internal/invoices/InvoicesList';
+import DiscountTiersConfig from './pages/internal/products/DiscountTiersConfig';
 import ProductCatalog from './pages/internal/products/ProductCatalog';
 import AdminReportingDashboard from './pages/internal/reports/AdminReportingDashboard';
 import ProductDetail from './pages/internal/products/ProductDetail';
@@ -32,7 +33,13 @@ import Preview from './pages/Preview';
 import SystemStatus from './pages/SystemStatus';
 import PortalRoutes from './routes/portal-routes';
 import { RequireAuth, RequireRole } from './routes/guards';
-import { ADMIN_ONLY, APPROVALS_ROLES, BILLING_ROLES, REPORTING_ROLES } from './routes/access';
+import {
+  ADMIN_ONLY,
+  APPROVALS_ROLES,
+  BILLING_ROLES,
+  DISCOUNT_CONFIG_ROLES,
+  REPORTING_ROLES,
+} from './routes/access';
 
 export default function App() {
   return (
@@ -156,6 +163,17 @@ export default function App() {
           <RequireAuth>
             <ProductDetail />
           </RequireAuth>
+        }
+      />
+
+      {/* Discount ceilings are policy: everyone is priced against them, but only
+          an admin sets them (specs.md screen 18). */}
+      <Route
+        path="/discount-tiers"
+        element={
+          <RequireRole allow={DISCOUNT_CONFIG_ROLES}>
+            <DiscountTiersConfig />
+          </RequireRole>
         }
       />
 

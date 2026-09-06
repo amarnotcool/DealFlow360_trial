@@ -3,7 +3,14 @@ import type { ReactNode } from 'react';
 import type { RoleCode } from '@dealflow360/shared';
 
 import { useAuth } from '../../features/auth/useAuth';
-import { ADMIN_ONLY, ALL_ROLES, APPROVALS_ROLES, BILLING_ROLES, REPORTING_ROLES } from '../../routes/access';
+import {
+  ADMIN_ONLY,
+  ALL_ROLES,
+  APPROVALS_ROLES,
+  BILLING_ROLES,
+  DISCOUNT_CONFIG_ROLES,
+  REPORTING_ROLES,
+} from '../../routes/access';
 import { cn } from '../ui/cn';
 
 interface NavItem {
@@ -47,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Products', to: '/products', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /> },
   { label: 'Warehouses', to: '/warehouses', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M3 10.5 12 4l9 6.5V20H3zM9 20v-6h6v6" /> },
   { label: 'Customers', to: '/customers', enabled: true, roles: ALL_ROLES, icon: <Glyph d="M17 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9.5 10a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM22 20v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8" /> },
+  { label: 'Discount Tiers', to: '/discount-tiers', enabled: true, roles: DISCOUNT_CONFIG_ROLES, icon: <Glyph d="M8 16 16 8M9 9h.01M15 15h.01M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z" /> },
   { label: 'Staff Users', to: '/users', enabled: true, roles: ADMIN_ONLY, icon: <Glyph d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1M18 8h4M20 6v4" /> },
 ];
 
